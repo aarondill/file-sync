@@ -1,4 +1,4 @@
-CFLAGS = -std=c11 -g -lpthread -lm -lcrypto
+CFLAGS = -std=c11 -g -lpthread -lm -lcrypto -D_POSIX_C_SOURCE=200809L
 CC=gcc
 
 EXECS = file-server file-client

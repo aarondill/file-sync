@@ -28,7 +28,7 @@ Note that this means the server is effectively a client that additionally mainta
 
 ### Client connect message
 
-- 4 bits for protocol version
+- 8 bits for protocol version
   - Must be 1
   - The server must reject any connection with a different version. No backwards compatibility here.
 - 8 bits of flags
@@ -41,6 +41,8 @@ Note that this means the server is effectively a client that additionally mainta
   - Clients _must_ be identified by IP/port
   - It is only for output purposes, the server should indicate if duplicate names are detected (output IP/port)
 
+Total header size is 3 bytes
+
 Note that this may be responded with an error if there are too many clients.
 
 ### Download message
@@ -49,8 +51,10 @@ Note that this may be responded with an error if there are too many clients.
 2. download response
 3. download message 2 - file contents
 
-- 1 bit for error
-  - Must be 0
+- 8 bits for flags
+  - bit 0 - error
+    - Must be 0
+  - rest of bits are reserved for future use
 - 8 bits for file count
   - Note: supports up to 255 files
 - for each file:
@@ -58,27 +62,39 @@ Note that this may be responded with an error if there are too many clients.
   - 8 bits for file name length in bytes
     - Note: supports up to 255 bytes
     - Files with longer names should be rejected (don't truncate because it can cause security issues, and split characters in the middle)
-  - File name (max of 255 bytes, variable length)
   - 32 bits for file size in bytes
     - Note: supports up to 4 GB
     - Must be zero on initial message → client responds with subset of files to download
+  - File name (max of 255 bytes, variable length)
   - File data (variable length)
+
+Total header size is 2 bytes
+Each file header is 21 bytes
 
 ### Download response
 
-- 1 bit for error
-  - Must be 0
+- 8 bits for flags
+  - bit 0 - error
+    - Must be 0
+  - bits 1-7 - reserved
 - 8 bits for file count
 - for each file:
   - 128 bits for file hash (MD5)
     - server identifies file by hash
     - respond with error if hash not found (must process all names before initiating download)
 
+Total header size is 2 bytes
+Each file header is 16 bytes
+
 ### Error message
 
-- 1 bit for error
-  - Must be 1
+- 8 bits for flags
+  - bit 0 - error
+    - Must be 1
+  - rest of bits are reserved for future use
 - 8 bits for error code
 - 8 bits for error message length in bytes
   - Note: supports up to 255 bytes
 - variable length error message
+
+Total header size is 3 bytes

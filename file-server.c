@@ -1,3 +1,5 @@
+#include "protocol.h"
+#include "util.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -30,6 +32,41 @@ void remove_client(int fd) {
     clientfds[j] = clientfds[j + 1];
   }
   n_clients--;
+}
+
+void initiate_download(int clientfd) {
+  // TODO: get file list & hashes
+  download_m msg = {
+      .flags = 0,
+      .file_count = 0,
+  };
+  uint8_t buf[4096];
+  serror_t err;
+  size_t len = serialize_download(buf, sizeof(buf), &msg, &err);
+  if (err != NO_ERROR) {
+    printf("error serializing download message\n");
+    return;
+  }
+  if (!write_all(clientfd, buf, len)) {
+    printf("error sending download message\n");
+    return;
+  }
+
+  download_file_m *files = malloc(sizeof(download_file_m) * msg.file_count);
+  for (size_t i = 0; i < msg.file_count; i++) {
+    len = serialize_download_file(buf, sizeof(buf), &files[i], &err);
+    if (err != NO_ERROR) {
+      printf("error serializing download file\n");
+      return;
+    }
+    if (!write_all(clientfd, buf, len)) {
+      printf("error sending download file\n");
+      return;
+    }
+  }
+  free(files);
+  // TODO: read response
+  // TODO: send download again
 }
 
 const int port = 8080; // TODO: make this a command line argument?

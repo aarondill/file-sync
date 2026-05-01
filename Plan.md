@@ -41,12 +41,16 @@ Note that this means the server is effectively a client that additionally mainta
   - Clients _must_ be identified by IP/port
   - It is only for output purposes, the server should indicate if duplicate names are detected (output IP/port)
 
-### download message
+Note that this may be responded with an error if there are too many clients.
+
+### Download message
 
 1. download message 1 - no file contents
 2. download response
 3. download message 2 - file contents
 
+- 1 bit for error
+  - Must be 0
 - 8 bits for file count
   - Note: supports up to 255 files
 - for each file:
@@ -60,10 +64,21 @@ Note that this means the server is effectively a client that additionally mainta
     - Must be zero on initial message → client responds with subset of files to download
   - File data (variable length)
 
-### download response
+### Download response
 
+- 1 bit for error
+  - Must be 0
 - 8 bits for file count
 - for each file:
   - 128 bits for file hash (MD5)
     - server identifies file by hash
     - respond with error if hash not found (must process all names before initiating download)
+
+### Error message
+
+- 1 bit for error
+  - Must be 1
+- 8 bits for error code
+- 8 bits for error message length in bytes
+  - Note: supports up to 255 bytes
+- variable length error message

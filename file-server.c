@@ -103,6 +103,16 @@ int main(void) {
       continue;
     }
 
+    // HACK: an echo server for testing
+    uint8_t buf[4096] = {0};
+    int n = 0;
+    while ((n = read(connfd, buf, sizeof(buf))) > 0) {
+      if (!write_all(connfd, buf, n)) {
+        printf("error sending message\n");
+        break;
+      }
+    }
+
     // create a  thread here for dedicated server with current numUsers as
     // parameter?
     // TODO: parse client connection message

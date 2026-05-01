@@ -35,11 +35,10 @@ struct client_connect_m {
   char name[255];
 };
 
-serror_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,
-                                    size_t len);
-
-serror_t serialize_client_connect(uint8_t *buf, size_t len,
-                                  const client_connect_m *in);
+size_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,
+                                  size_t len, serror_t *err);
+size_t serialize_client_connect(uint8_t *buf, size_t len,
+                                const client_connect_m *in, serror_t *err);
 
 // -- Download Message --
 enum flags {
@@ -69,13 +68,15 @@ struct download_file_m {
   char name[255];
 };
 
-serror_t deserialize_download(download_m *out, const uint8_t *buf, size_t len);
-serror_t serialize_download(uint8_t *buf, size_t len, const download_m *in);
+size_t deserialize_download(download_m *out, const uint8_t *buf, size_t len,
+                            serror_t *err);
+size_t serialize_download(uint8_t *buf, size_t len, const download_m *in,
+                          serror_t *err);
 
-serror_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
-                                   size_t len);
-serror_t serialize_download_file(uint8_t *buf, size_t len,
-                                 const download_file_m *in);
+size_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
+                                 size_t len, serror_t *err);
+size_t serialize_download_file(uint8_t *buf, size_t len,
+                               const download_file_m *in, serror_t *err);
 
 // -- Download Response Message --
 typedef struct download_response_m download_response_m;
@@ -90,10 +91,12 @@ struct download_response_m {
   } files[255];
 };
 
-serror_t deserialize_download_response(download_response_m *out,
-                                       const uint8_t *buf, size_t len);
-serror_t serialize_download_response(uint8_t *buf, size_t len,
-                                     const download_response_m *in);
+size_t deserialize_download_response(download_response_m *out,
+                                     const uint8_t *buf, size_t len,
+                                     serror_t *err);
+size_t serialize_download_response(uint8_t *buf, size_t len,
+                                   const download_response_m *in,
+                                   serror_t *err);
 
 // -- Error Message --
 /* Values for error_m.code */
@@ -112,5 +115,7 @@ struct error_m {
   char message[255];
 };
 
-serror_t deserialize_error(error_m *out, const uint8_t *buf, size_t len);
-serror_t serialize_error(uint8_t *buf, size_t len, const error_m *in);
+size_t deserialize_error(error_m *out, const uint8_t *buf, size_t len,
+                         serror_t *err);
+size_t serialize_error(uint8_t *buf, size_t len, const error_m *in,
+                       serror_t *err);

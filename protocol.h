@@ -9,6 +9,7 @@ enum d_error_t {
   NO_ERROR,
   IS_ERROR, // tried to deserialize a message with the error flag set
   INVALID_PROTOCOL_VERSION,
+  NOT_ENOUGH_DATA,
 };
 typedef enum d_error_t d_error_t;
 
@@ -30,8 +31,8 @@ struct client_connect_m {
   uint8_t flags;
   /* 8 bits for client name length in bytes */
   uint8_t name_len;
-  /* human-readable client name (max of 256 bytes, variable length) */
-  char name[256];
+  /* human-readable client name (max of 255 bytes, variable length) */
+  char name[255];
 };
 
 d_error_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,

@@ -35,7 +35,7 @@ Note that this means the server is effectively a client that additionally mainta
   - bit 0 - intent to upload
   - rest of bits are reserved for future use
 - 8 bits for client name length in bytes
-- human-readable client name (max of 256 bytes, variable length)
+- human-readable client name (max of 255 bytes, variable length)
   - suggested to use hostname
   - Note: this is not required to be unique
   - Clients _must_ be identified by IP/port

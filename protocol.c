@@ -6,6 +6,22 @@
 #include <stdint.h>
 #include <string.h>
 
+serror_t deserialize_uint32(uint32_t *out, const uint8_t *buf, size_t len) {
+  if (len < sizeof(uint32_t))
+    return NOT_ENOUGH_DATA;
+  *out = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+  return NO_ERROR;
+}
+serror_t serialize_uint32(uint8_t *buf, size_t len, const uint32_t in) {
+  if (len < sizeof(uint32_t))
+    return NOT_ENOUGH_DATA;
+  buf[0] = in & 0xFF;
+  buf[1] = (in >> 8) & 0xFF;
+  buf[2] = (in >> 16) & 0xFF;
+  buf[3] = (in >> 24) & 0xFF;
+  return NO_ERROR;
+}
+
 /* Note that it's safe to write a uint8 directly since it's a single byte */
 serror_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,
                                     size_t len) {
@@ -84,7 +100,8 @@ serror_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
   buf += HASH_SIZE; // skip hash
 
   out->name_len = buf[0];
-  out->size = buf[1];
+  if ((err = deserialize_uint32(&out->size, buf + 1, len - 1)))
+    return err;
   if (len < min_len + out->name_len)
     return NOT_ENOUGH_DATA;
   memcpy(out->name, buf + 2, out->name_len);
@@ -102,7 +119,8 @@ serror_t serialize_download_file(uint8_t *buf, size_t len,
   buf += HASH_SIZE;
 
   buf[0] = in->name_len;
-  buf[1] = in->size;
+  if ((err = serialize_uint32(buf + 1, len - 1, in->size)))
+    return err;
   memcpy(buf + 2, in->name, in->name_len);
   return NO_ERROR;
 }

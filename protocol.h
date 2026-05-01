@@ -4,14 +4,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Deserialization error
-enum d_error_t {
+// (De)serialization error
+enum serror_t {
   NO_ERROR,
   IS_ERROR, // tried to deserialize a message with the error flag set
   INVALID_PROTOCOL_VERSION,
   NOT_ENOUGH_DATA,
 };
-typedef enum d_error_t d_error_t;
+typedef enum serror_t serror_t;
 
 // -- Client Connect Message --
 enum client_connect_flags {
@@ -35,11 +35,11 @@ struct client_connect_m {
   char name[255];
 };
 
-d_error_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,
-                                     size_t len);
+serror_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,
+                                    size_t len);
 
-void serialize_client_connect(uint8_t *buf, size_t len,
-                              const client_connect_m *in);
+serror_t serialize_client_connect(uint8_t *buf, size_t len,
+                                  const client_connect_m *in);
 
 // -- Download Message --
 enum flags {
@@ -63,19 +63,19 @@ struct download_file_m {
   uint8_t hash[MD5_DIGEST_LENGTH];
   /* 8 bits for file name length in bytes */
   uint8_t name_len;
-  /* File name (max of 255 bytes, variable length) */
-  char name[255];
   /* 32 bits for file size in bytes */
   uint32_t size;
+  /* File name (max of 255 bytes, variable length) */
+  char name[255];
 };
 
-d_error_t deserialize_download(download_m *out, const uint8_t *buf, size_t len);
-void serialize_download(uint8_t *buf, size_t len, const download_m *in);
+serror_t deserialize_download(download_m *out, const uint8_t *buf, size_t len);
+serror_t serialize_download(uint8_t *buf, size_t len, const download_m *in);
 
-d_error_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
-                                    size_t len);
-void serialize_download_file(uint8_t *buf, size_t len,
-                             const download_file_m *in);
+serror_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
+                                   size_t len);
+serror_t serialize_download_file(uint8_t *buf, size_t len,
+                                 const download_file_m *in);
 
 // -- Download Response Message --
 typedef struct download_response_m download_response_m;
@@ -90,12 +90,16 @@ struct download_response_m {
   } files[255];
 };
 
-d_error_t deserialize_download_response(download_response_m *out,
-                                        const uint8_t *buf, size_t len);
-void serialize_download_response(uint8_t *buf, size_t len,
-                                 const download_response_m *in);
+serror_t deserialize_download_response(download_response_m *out,
+                                       const uint8_t *buf, size_t len);
+serror_t serialize_download_response(uint8_t *buf, size_t len,
+                                     const download_response_m *in);
 
 // -- Error Message --
+/* Values for error_m.code */
+enum error_code {
+  TOO_MANY_CLIENTS = 1,
+};
 typedef struct error_m error_m;
 struct error_m {
   /* 8 bits for flags */
@@ -108,5 +112,5 @@ struct error_m {
   char message[255];
 };
 
-d_error_t deserialize_error(error_m *out, const uint8_t *buf, size_t len);
-void serialize_error(uint8_t *buf, size_t len, const error_m *in);
+serror_t deserialize_error(error_m *out, const uint8_t *buf, size_t len);
+serror_t serialize_error(uint8_t *buf, size_t len, const error_m *in);

@@ -104,7 +104,7 @@ size_t serialize_hash(uint8_t *buf, size_t len, const uint8_t *in,
 size_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
                                  size_t len, serror_t *err) {
   const uint8_t *const obuf = buf; // original buf
-  serror_t err2;
+  serror_t err2 = 0;
   buf += deserialize_hash(out->hash, buf, len, &err2);
   if (err2)
     RET_ERR(err2);
@@ -125,7 +125,7 @@ size_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
 size_t serialize_download_file(uint8_t *buf, size_t len,
                                const download_file_m *in, serror_t *err) {
   const uint8_t *const obuf = buf; // original buf
-  serror_t err2;
+  serror_t err2 = 0;
 
   buf += serialize_hash(buf, len, in->hash, &err2);
   if (err2)
@@ -161,7 +161,7 @@ size_t deserialize_download_response(download_response_m *out,
   out->file_count = *buf++;
 
   for (size_t i = 0; i < out->file_count; i++) {
-    serror_t err2;
+    serror_t err2 = 0;
     buf += deserialize_hash(out->files[i].hash, buf, len - (buf - obuf), &err2);
     if (err2)
       RET_ERR(err2);
@@ -180,7 +180,7 @@ size_t serialize_download_response(uint8_t *buf, size_t len,
   *buf++ = in->file_count;
 
   for (size_t i = 0; i < in->file_count; i++) {
-    serror_t err2;
+    serror_t err2 = 0;
     buf += serialize_hash(buf, len - (buf - obuf), in->files[i].hash, &err2);
     if (err2)
       RET_ERR(err2);

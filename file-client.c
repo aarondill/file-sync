@@ -1,3 +1,4 @@
+#include "protocol.h"
 #include "util.h"
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -9,13 +10,64 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+// returns a socket file descriptor
+// if it fails, exits
+int init_connection(const char *server) {
+  int port = 8080;
+  char *portp = strrchr(server, ':');
+  if (portp != NULL) {
+    *portp = '\0';
+    port = atoi(portp + 1);
+  }
+
+  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0) {
+    perror("socket");
+    exit(1);
+  }
+
+  struct sockaddr_in serv_addr = {
+      .sin_addr.s_addr = inet_addr(server),
+      .sin_family = AF_INET,
+      .sin_port = htons(port),
+  };
+  if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    perror("connect");
+    exit(1);
+  }
+  return sockfd;
+}
+
+// Initialize a client connect message
+// If name is NULL, the name will be set to the hostname returned by gethostname
+client_connect_m init_connect_msg(const char *name, bool upload) {
+  client_connect_m msg = {
+      .version = CLIENT_VERSION,
+      .flags = upload ? INTENT_TO_UPLOAD : 0,
+  };
+  if (name) {
+    // truncate name
+    size_t len = strnlen(name, sizeof(msg.name));
+    memcpy(msg.name, name, len);
+    msg.name_len = len;
+  } else {
+    if (gethostname(msg.name, sizeof(msg.name)) < 0) {
+      perror("gethostname");
+      exit(1);
+    }
+    msg.name_len = strnlen(msg.name, sizeof(msg.name));
+  }
+  return msg;
+}
+
 int main(int argc, char **argv) {
-  bool update = false;
+  bool upload = false;
   int opt;
   while ((opt = getopt(argc, argv, "u")) != -1) {
     switch (opt) {
     case 'u':
-      update = true;
+      upload = true;
       break;
     default:
       fprintf(stderr, "usage: %s <server ip> <directory> [-u]\n", argv[0]);
@@ -28,34 +80,18 @@ int main(int argc, char **argv) {
   }
   char *server = argv[optind]; // name:port; name may be host or IP
   char *directory = argv[optind + 1];
+  int sockfd = init_connection(server);
 
-  int port = 8080;
-  char *portp = strrchr(server, ':');
-  if (portp != NULL) {
-    *portp = '\0';
-    port = atoi(portp + 1);
-  }
-
-  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd < 0) {
-    perror("socket");
+  client_connect_m msg = init_connect_msg(NULL, upload);
+  uint8_t buf[4096];
+  serror_t err;
+  size_t len = serialize_client_connect(buf, sizeof(buf), &msg, &err);
+  if (err) {
+    fprintf(stderr, "error serializing client connect message\n");
     return 1;
   }
+  write_all(sockfd, (uint8_t *)buf, len);
 
-  struct sockaddr_in serv_addr = {
-      .sin_family = AF_INET,
-      .sin_port = htons(port),
-      .sin_addr.s_addr = inet_addr(server),
-  };
-  if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-    perror("connect");
-    return 1;
-  }
-
-  // TODO: send connection
-  printf("connected\n");
-  char buf[] = "hello world";
-  write_all(sockfd, (uint8_t *)buf, sizeof(buf));
   int n;
   while ((n = read(sockfd, buf, sizeof(buf))) > 0) {
     printf("read %d bytes: \n", n);

@@ -2,6 +2,7 @@
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
+#include <linux/limits.h>
 #include <md5.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -38,18 +39,31 @@ file_list *file_list_read(const char *path) {
   struct dirent *ent;
   struct stat st;
   uint8_t hash[MD5_DIGEST_LENGTH];
+
+  char pathbuf[255] = {0};
+  char *dirend = pathbuf + snprintf(pathbuf, sizeof(pathbuf), "%s/", path);
+  size_t path_len = sizeof(pathbuf) - (dirend - pathbuf);
   while ((ent = readdir(dir))) {
-    if (stat(ent->d_name, &st))
+    // skip . and ..
+    if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
+      continue;
+    if (strlen(ent->d_name) + 1 > path_len) {
+      warn("path too long: %s/%s", path, ent->d_name);
+      continue;
+    }
+    strcpy(dirend, ent->d_name);
+    ent = NULL; // no more of this
+    if (lstat(pathbuf, &st))
       continue;
 
     if (S_ISDIR(st.st_mode)) {
-      file_list_append(&list, file_list_read(ent->d_name));
+      file_list_append(&list, file_list_read(pathbuf));
     } else if (S_ISREG(st.st_mode)) {
       file_list_append(&list,
-                       file_list_new(ent->d_name, strlen(ent->d_name),
-                                     st.st_size, hash_file(ent->d_name, hash)));
+                       file_list_new(pathbuf, strlen(pathbuf), st.st_size,
+                                     hash_file(pathbuf, hash)));
     } else {
-      warn("unknown file type: %s", ent->d_name);
+      warn("unknown file type: %s", pathbuf);
     }
   }
   closedir(dir);

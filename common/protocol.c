@@ -155,7 +155,7 @@ size_t serialize_download_file(uint8_t *buf, size_t len,
 
   CHECK_REMAIN_LEN(len, in->name_len);
   memcpy(buf, in->name, in->name_len);
-
+  buf += in->name_len;
   return buf - obuf;
 }
 

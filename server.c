@@ -1,76 +1,45 @@
+#include "common/download.h"
+#include "common/file_list.h"
 #include "common/protocol.h"
+#include "common/upload.h"
 #include "common/util.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#define BUFSIZE 4096
 
-#define MAXUSERS 100
-// a set of clients
-int clientfds[MAXUSERS];
-size_t n_clients = 0;
-bool add_client(int fd) {
-  if (n_clients >= MAXUSERS) {
-    return false;
+// #define MAXUSERS 100
+// TODO: multithreading. Keep a list of tids and use pthread_kill to signal an
+// upload
+// TODO: use a rwlock on global_list
+file_list *global_list = NULL;
+// TODO: make array (bool per thread) of upload_pending
+volatile bool upload_pending = false;
+volatile bool stop = false;
+
+void signal_handler(int signum) {
+  if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) {
+    stop = true;
   }
-  clientfds[n_clients++] = fd;
-  return true;
-}
-void remove_client(int fd) {
-  // TODO: lock around the global array
-  size_t i = 0;
-  while (i < n_clients && clientfds[i] != fd)
-    i++;
-  // move rest of the clients to the left
-  for (size_t j = i; j < n_clients - 1; j++) {
-    clientfds[j] = clientfds[j + 1];
-  }
-  n_clients--;
 }
 
-void initiate_download(int clientfd) {
-  // TODO: get file list & hashes
-  download_m msg = {
-      .flags = 0,
-      .file_count = 0,
-  };
-  uint8_t buf[4096];
-  serror_t err = 0;
-  size_t len = serialize_download(buf, sizeof(buf), &msg, &err);
-  if (err != NO_ERROR) {
-    printf("error serializing download message\n");
-    return;
+int main(int argc, char **argv) {
+  if (argc > 3 || argc < 2) {
+    fprintf(stderr, "usage: %s <dir> [port]\n", argv[0]);
+    return 2;
   }
-  if (!write_all(clientfd, buf, len)) {
-    printf("error sending download message\n");
-    return;
+  int port = 8080;
+  if (argc == 3) {
+    port = atoi(argv[1]);
   }
+  char *directory = argv[1];
 
-  download_file_m *files = malloc(sizeof(download_file_m) * msg.file_count);
-  for (size_t i = 0; i < msg.file_count; i++) {
-    len = serialize_download_file(buf, sizeof(buf), &files[i], &err);
-    if (err != NO_ERROR) {
-      printf("error serializing download file\n");
-      return;
-    }
-    if (!write_all(clientfd, buf, len)) {
-      printf("error sending download file\n");
-      return;
-    }
-  }
-  free(files);
-  // TODO: read response
-  // TODO: send download again
-}
-
-const int port = 8080; // TODO: make this a command line argument?
-int main(void) {
   int listenfd = socket(AF_INET, SOCK_STREAM, 0);
   if (listenfd < 0) {
     perror("socket");
@@ -94,33 +63,43 @@ int main(void) {
     return 1;
   }
 
+  file_list_free(global_list);
+  global_list = file_list_read(directory);
   while (true) {
+    // TODO: create a thread here for dedicated server
     int connfd = accept(listenfd, NULL, NULL);
-    if (!add_client(connfd)) {
-      printf("too many clients\n");
-      // TODO: send error message to client (define error codes)
-      close(connfd);
-      continue;
+    uint8_t buf[BUFSIZE];
+    read_message(connfd, buf, sizeof(buf));
+    serror_t err = 0;
+    client_connect_m msg = {0};
+    deserialize_client_connect(&msg, buf, sizeof(buf), &err);
+    if (err) {
+      error("error deserializing client connect message\n");
+      return 1;
     }
+    printf("Client connected: ");
+    printlen(msg.name, msg.name_len);
 
-    // HACK: an echo server for testing
-    uint8_t buf[4096] = {0};
-    int n = 0;
-    while ((n = read(connfd, buf, sizeof(buf))) > 0) {
-      if (!write_all(connfd, buf, n)) {
-        printf("error sending message\n");
-        break;
+    // The server starts by sending an upload to the client unless the client
+    // explicitly requests otherwise
+    upload_pending = !(msg.flags & INTENT_TO_UPLOAD);
+
+    signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGQUIT, signal_handler);
+
+    while (!stop) {
+      if (!upload_pending) {
+        download(connfd, global_list);
+        // TODO: mark other threads as uploading
+      }
+      // note: this value can change during `download`
+      if (upload_pending) {
+        upload(connfd, global_list);
+        upload_pending = false;
       }
     }
 
-    // create a  thread here for dedicated server with current numUsers as
-    // parameter?
-    // TODO: parse client connection message
-    // TODO: wait for upload message
-    // TODO: send download message
-
     close(connfd);
-    // user has quit - update the global arrays?
-    remove_client(connfd);
   }
 }

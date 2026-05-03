@@ -26,3 +26,13 @@ ssize_t read_message(int fd, uint8_t *buf, size_t max);
     _print("fatal: ", ##__VA_ARGS__);                                          \
     exit(1);                                                                   \
   } while (0)
+
+inline void printhex(const uint8_t *buf, size_t len) {
+  for (size_t i = 0; i < len; i++)
+    printf("%02x", buf[i]);
+  printf("\n");
+}
+inline void printlen(const char *x, size_t len) {
+  for (size_t i = 0; i < len; i++)
+    printf("%c", x[i]);
+}

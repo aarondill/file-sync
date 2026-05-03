@@ -120,11 +120,9 @@ void download(int sockfd, const file_list *files) {
   while (iter) {
     // TODO: read the file contents
     printf("recv: ");
-    for (size_t i = 0; i < iter->name_len; i++)
-      printf("%c", iter->name[i]);
+    printlen(iter->name, iter->name_len);
     printf(" ");
-    for (size_t i = 0; i < MD5_DIGEST_LENGTH; i++)
-      printf("%02x", iter->hash[i]);
+    printhex(iter->hash, MD5_DIGEST_LENGTH);
     printf("\n");
     iter = iter->next;
   }

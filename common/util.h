@@ -11,11 +11,18 @@ bool write_message(int fd, const uint8_t *buf, size_t len);
 // Reads the length of the message as a uint16_t, followed by the message
 ssize_t read_message(int fd, uint8_t *buf, size_t max);
 
-#define debug(fmt, ...) fprintf(stderr, "debug: " fmt "\n", ##__VA_ARGS__)
-#define warn(fmt, ...) fprintf(stderr, "warning: " fmt "\n", ##__VA_ARGS__)
-#define error(fmt, ...) fprintf(stderr, "error: " fmt "\n", ##__VA_ARGS__)
-#define fatal(fmt, ...)                                                        \
+#define _print(fmt, ...)                                                       \
   do {                                                                         \
-    fprintf(stderr, "fatal: " fmt "\n", ##__VA_ARGS__);                        \
+    fputs(fmt, stderr);                                                        \
+    fprintf(stderr, __VA_ARGS__);                                              \
+    fputs("\n", stderr);                                                       \
+  } while (0)
+
+#define debug(...) _print("debug: ", ##__VA_ARGS__)
+#define warn(...) _print("warning: ", ##__VA_ARGS__)
+#define error(...) _print("error: ", ##__VA_ARGS__)
+#define fatal(...)                                                             \
+  do {                                                                         \
+    _print("fatal: ", ##__VA_ARGS__);                                          \
     exit(1);                                                                   \
   } while (0)

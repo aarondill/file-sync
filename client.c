@@ -1,9 +1,13 @@
+#include "common/download.h"
 #include "common/file_list.h"
 #include "common/protocol.h"
+#include "common/upload.h"
 #include "common/util.h"
 #include <arpa/inet.h>
+#include <assert.h>
 #include <netdb.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#define BUFSIZE 4096
 
 // returns a socket file descriptor
 // if it fails, exits
@@ -62,13 +67,16 @@ client_connect_m init_connect_msg(const char *name, bool upload) {
   return msg;
 }
 
+// No locking is required here, since the client is single-threaded
+file_list *global_list = NULL;
+
 int main(int argc, char **argv) {
-  bool upload = false;
+  bool should_upload = false;
   int opt;
   while ((opt = getopt(argc, argv, "u")) != -1) {
     switch (opt) {
     case 'u':
-      upload = true;
+      should_upload = true;
       break;
     default:
       fprintf(stderr, "usage: %s <server ip> <directory> [-u]\n", argv[0]);
@@ -81,29 +89,36 @@ int main(int argc, char **argv) {
   }
   char *server = argv[optind]; // name:port; name may be host or IP
   char *directory = argv[optind + 1];
+
   int sockfd = init_connection(server);
 
-  client_connect_m msg = init_connect_msg(NULL, upload);
-  uint8_t buf[4096];
-  serror_t err;
-  size_t len = serialize_client_connect(buf, sizeof(buf), &msg, &err);
-  if (err) {
-    fprintf(stderr, "error serializing client connect message\n");
-    return 1;
-  }
-  write_all(sockfd, (uint8_t *)buf, len);
-
-  int n;
-  while ((n = read(sockfd, buf, sizeof(buf))) > 0) {
-    printf("read %d bytes: \n", n);
-    for (int i = 0; i < n; i++) {
-      printf("%c ", buf[i]);
+  { // send connect message
+    client_connect_m msg = init_connect_msg(NULL, should_upload);
+    uint8_t buf[BUFSIZE];
+    serror_t err = 0;
+    size_t len = serialize_client_connect(buf, sizeof(buf), &msg, &err);
+    if (err) {
+      error("error serializing client connect message\n");
+      return 1;
     }
-    printf("\n");
-  }
-  // TODO: if update, send update
-  // TODO: handle downloads
-  close(sockfd);
 
+    if (!write_message(sockfd, buf, len)) {
+      error("error writing client connect message\n");
+      return 1;
+    }
+  }
+
+  if (should_upload) {
+    file_list_update(&global_list, directory);
+    upload(sockfd, global_list);
+  }
+
+  // use poll() to wait for either server messages or user input
+  /*   file_list_update(&global_list, directory); */
+  /* download(sockfd, global_list); */
+  // if server message, parse, then call respond_download
+  // if user input, call upload
+
+  close(sockfd);
   return 0;
 }

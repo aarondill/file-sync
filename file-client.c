@@ -1,5 +1,6 @@
-#include "protocol.h"
-#include "util.h"
+#include "common/file_list.h"
+#include "common/protocol.h"
+#include "common/util.h"
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdbool.h>

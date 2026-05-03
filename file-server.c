@@ -1,5 +1,5 @@
-#include "protocol.h"
-#include "util.h"
+#include "common/protocol.h"
+#include "common/util.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -41,7 +41,7 @@ void initiate_download(int clientfd) {
       .file_count = 0,
   };
   uint8_t buf[4096];
-  serror_t err;
+  serror_t err = 0;
   size_t len = serialize_download(buf, sizeof(buf), &msg, &err);
   if (err != NO_ERROR) {
     printf("error serializing download message\n");
@@ -78,8 +78,8 @@ int main(void) {
   }
 
   struct sockaddr_in serv_addr = {
+      .sin_addr.s_addr = htonl(INADDR_ANY),
       .sin_family = AF_INET,
-      .sin_addr = {.s_addr = htonl(INADDR_ANY)},
       .sin_port = htons(port),
   };
 

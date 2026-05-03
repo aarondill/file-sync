@@ -1,18 +1,14 @@
-CFLAGS = -std=c11 -g -lpthread -lm -lcrypto -D_POSIX_C_SOURCE=200809L
-CC=gcc
+CFLAGS := -std=c11 -g -Wall -Wextra -pedantic -lpthread -lm -lcrypto -D_POSIX_C_SOURCE=200809L
 
-EXECS = file-server file-client
-DEPS = util.h protocol.h
-OBJS = util.o protocol.o
+EXECS := $(patsubst %.c,%,$(wildcard *.c))
+DEPS := $(wildcard common/*.h)
+OBJS := $(patsubst %.c,%.o,$(wildcard common/*.c))
 
 .PHONY: all
 
 all: $(EXECS)
 
-file-server: file-server.c $(DEPS) $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $< $(OBJS)
-
-file-client: file-client.c $(DEPS)
+%: %.c $(DEPS) $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $< $(OBJS)
 
 clean: 

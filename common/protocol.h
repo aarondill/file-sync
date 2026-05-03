@@ -13,6 +13,16 @@ enum serror_t {
 };
 typedef enum serror_t serror_t;
 
+size_t deserialize_uint32(uint32_t *out, const uint8_t *buf, size_t len,
+                          serror_t *err);
+size_t serialize_uint32(uint8_t *buf, size_t len, const uint32_t in,
+                        serror_t *err);
+
+size_t deserialize_uint16(uint16_t *out, const uint8_t *buf, size_t len,
+                          serror_t *err);
+size_t serialize_uint16(uint8_t *buf, size_t len, const uint16_t in,
+                        serror_t *err);
+
 // -- Client Connect Message --
 enum client_connect_flags {
   INTENT_TO_UPLOAD = 1 << 0,

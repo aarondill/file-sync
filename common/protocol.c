@@ -41,6 +41,20 @@ size_t serialize_uint32(uint8_t *buf, size_t len, const uint32_t in,
   return sizeof(uint32_t);
 }
 
+size_t serialize_uint16(uint8_t *buf, size_t len, const uint16_t in,
+                        serror_t *err) {
+  CHECK_LEN(len, sizeof(uint16_t));
+  buf[0] = in & 0xFF;
+  buf[1] = (in >> 8) & 0xFF;
+  return sizeof(uint16_t);
+}
+size_t deserialize_uint16(uint16_t *out, const uint8_t *buf, size_t len,
+                          serror_t *err) {
+  CHECK_LEN(len, sizeof(uint16_t));
+  *out = buf[0] | (buf[1] << 8);
+  return sizeof(uint16_t);
+}
+
 /* Note that it's safe to write a uint8 directly since it's a single byte */
 size_t deserialize_client_connect(client_connect_m *out, const uint8_t *buf,
                                   size_t len, serror_t *err) {

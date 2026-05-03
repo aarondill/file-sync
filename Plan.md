@@ -26,6 +26,8 @@ Note that this means the server is effectively a client that additionally mainta
 
 ## Protocol
 
+All messages start with an uint16 length field, followed by the header length!
+
 ### Client connect message
 
 - 8 bits for protocol version

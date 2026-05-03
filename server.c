@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   }
   int port = 8080;
   if (argc == 3) {
-    port = atoi(argv[1]);
+    port = atoi(argv[2]);
   }
   char *directory = argv[1];
 

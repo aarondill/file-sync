@@ -1,6 +1,7 @@
 #include "util.h"
 #include "protocol.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -11,6 +12,8 @@ bool write_all(int fd, const uint8_t *buf, size_t len) {
   while (written < len) {
     ssize_t ret = write(fd, buf + written, len - written);
     if (ret < 0) {
+      if (errno == EINTR)
+        continue;
       perror("write");
       return false;
     }
@@ -28,8 +31,12 @@ ssize_t read_all(int fd, uint8_t *buf, size_t min, size_t max) {
     if (to_read > min)
       to_read = min;
     ssize_t ret = read(fd, buf + got, to_read);
-    if (ret < 0)
+    if (ret < 0) {
+      // if we read something, keep going
+      if (errno == EINTR && got > 0)
+        continue;
       return -1;
+    }
     got += ret;
   }
   assert(got == min);

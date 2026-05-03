@@ -3,6 +3,7 @@
 #include "protocol.h"
 #include "util.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #define BUFSIZE 4096
@@ -69,7 +70,6 @@ file_list *read_download_message(int fd, download_m *msg) {
     uint8_t buf[BUFSIZE];
     ssize_t n = read_message(fd, buf, sizeof(buf));
     if (n < 0) {
-      error("error reading download message");
       return NULL;
     }
     serror_t err = 0;
@@ -87,6 +87,12 @@ void download(int sockfd, const file_list *files) {
   //  read the download message
   download_m msg = {0};
   file_list *recvlist = read_download_message(sockfd, &msg);
+  if (!recvlist) {
+    // abort if interrupted (to allow an upload to be started)
+    if (errno != EINTR)
+      perror("read_download_message");
+    return;
+  }
 
   { // filter the recv list to exclude anything that we already have
     file_list **p = &recvlist;
@@ -107,7 +113,9 @@ void download(int sockfd, const file_list *files) {
   file_list_free(recvlist);
 
   // read download message 2
-  recvlist = read_download_message(sockfd, &msg);
+  do {
+    recvlist = read_download_message(sockfd, &msg);
+  } while (!recvlist && errno == EINTR); // EINTR is okay
   file_list *iter = recvlist;
   while (iter) {
     // TODO: read the file contents

@@ -2,6 +2,7 @@
 #include "file_list.h"
 #include "protocol.h"
 #include "util.h"
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -67,7 +68,10 @@ void upload(int sockfd, const file_list *files) {
 
   // receive download response
   uint8_t buf[BUFSIZE];
-  ssize_t n = read_message(sockfd, buf, sizeof(buf));
+  ssize_t n;
+  do {
+    n = read_message(sockfd, buf, sizeof(buf));
+  } while (n < 0 && errno == EINTR); // EINTR is okay
   if (n < 0) {
     error("error reading download response");
     return;

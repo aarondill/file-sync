@@ -1,5 +1,5 @@
 /compile_commands.json
 *.o
 *.d
-/file-server
-/file-client
+/server
+/client

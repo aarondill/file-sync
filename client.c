@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <netdb.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -69,6 +70,16 @@ client_connect_m init_connect_msg(const char *name, bool upload) {
 
 // No locking is required here, since the client is single-threaded
 file_list *global_list = NULL;
+volatile bool upload_pending = false;
+volatile bool stop = false;
+
+void signal_handler(int signum) {
+  if (signum == SIGUSR1) {
+    upload_pending = true;
+  } else if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) {
+    stop = true;
+  }
+}
 
 int main(int argc, char **argv) {
   bool should_upload = false;
@@ -108,17 +119,27 @@ int main(int argc, char **argv) {
     }
   }
 
-  if (should_upload) {
-    file_list_update(&global_list, directory);
-    upload(sockfd, global_list);
+  file_list_free(global_list);
+  global_list = file_list_read(directory);
+
+  if (should_upload)
+    upload_pending = true;
+
+  signal(SIGUSR1, signal_handler);
+  signal(SIGTERM, signal_handler);
+  signal(SIGINT, signal_handler);
+  signal(SIGQUIT, signal_handler);
+
+  while (!stop) {
+    if (!upload_pending) {
+      download(sockfd, global_list);
+    }
+    // note: this value can change during `download`
+    if (upload_pending) {
+      upload(sockfd, global_list);
+      upload_pending = false;
+    }
   }
-
-  // use poll() to wait for either server messages or user input
-  /*   file_list_update(&global_list, directory); */
-  /* download(sockfd, global_list); */
-  // if server message, parse, then call respond_download
-  // if user input, call upload
-
   close(sockfd);
   return 0;
 }

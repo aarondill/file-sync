@@ -27,5 +27,11 @@ file_list *file_list_dup_node(const file_list *node);
 file_list *file_list_dup(const file_list *list);
 
 size_t file_list_len(const file_list *list);
-// Reads the directory and updates the file list in place
-void file_list_update(file_list **list, const char *path);
+
+// Inserts a list after the given node in the list
+// node.next == to_insert; to_insert's tail's next is node.next
+void file_list_insert(file_list **node, file_list *to_insert);
+void file_list_append(file_list **list, file_list *to_insert);
+
+// Reads the directory and returns a list of all files in the directory
+file_list *file_list_read(const char *path);

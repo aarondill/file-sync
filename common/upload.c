@@ -39,7 +39,6 @@ void write_file_list(int fd, const file_list *list, bool include_contents) {
 void write_download_message(int fd, const file_list *list,
                             bool include_contents) {
   size_t file_count = file_list_len(list);
-
   download_m msg = {
       .flags = 0,
       .file_count = file_count,
@@ -49,11 +48,11 @@ void write_download_message(int fd, const file_list *list,
     serror_t err = 0;
     size_t len = serialize_download(buf, sizeof(buf), &msg, &err);
     if (err) {
-      printf("error serializing download message\n");
+      error("error serializing download message\n");
       return;
     }
     if (!write_message(fd, buf, len)) {
-      printf("error sending download message\n");
+      error("error sending download message\n");
       return;
     }
   }
@@ -86,20 +85,18 @@ void upload(int sockfd, const file_list *files) {
 
   file_list *filtered_list = NULL;
   {
-    size_t i = 0;
-    const file_list *p = files;
-
     file_list **f_tail = &filtered_list;
-    // NOTE: The recipient *must* send the files in the same order as they were
-    // sent
-    while (i < resp.file_count && p) {
-      if (!memcmp(p->hash, resp.files[i].hash, MD5_DIGEST_LENGTH)) {
-        // p is in the sent list
-        *f_tail = file_list_dup_node(p);
-        f_tail = &(*f_tail)->next;
-        i++;
+    for (size_t i = 0; i < resp.file_count; i++) {
+      const file_list *p = file_list_find_hash(files, resp.files[i].hash);
+      if (!p) {
+        char out[MD5_DIGEST_LENGTH * 2 + 1] = {0};
+        for (size_t j = 0; j < MD5_DIGEST_LENGTH; j++)
+          sprintf(out + 2 * j, "%02x", resp.files[i].hash[j]);
+        fatal("file not found in local list: %s", out);
       }
-      p = p->next;
+      // p is in the sent list
+      *f_tail = file_list_dup_node(p);
+      f_tail = &(*f_tail)->next;
     }
   }
 

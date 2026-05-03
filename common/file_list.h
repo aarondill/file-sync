@@ -13,8 +13,12 @@ struct file_list {
 typedef struct file_list file_list;
 
 // Returns true if the list contains a node whose hash and name match
-bool file_list_contains(const file_list *list, file_list *node);
+const file_list *file_list_find(const file_list *list, file_list *node);
+const file_list *file_list_find_hash(const file_list *list,
+                                     const uint8_t *hash);
 
+file_list *file_list_new(const char *name, size_t name_len, size_t size,
+                         const uint8_t *hash);
 void file_list_free(file_list *list);
 // duplicates a single node.
 // node.next = NULL

@@ -1,9 +1,10 @@
 CFLAGS := -std=c11 -g -Wall -Wextra -pedantic -D_POSIX_C_SOURCE=200809L
+# Auto-dependency generation
+CFLAGS += -MMD -MP
 LDLIBS := -lpthread -lm -lcrypto
 
 EXECS := $(patsubst %.c,%,$(wildcard *.c))
-DEPS := $(wildcard common/*.h)
-OBJS := $(patsubst %.c,%.o,$(wildcard common/*.c))
+C_OBJS := $(patsubst %.c,%.o,$(wildcard common/*.c))
 
 .PHONY: all
 
@@ -11,11 +12,11 @@ all: $(EXECS)
 
 %: %.c # remove the implicit rule that refuses to use dependencies
 
-%: %.c $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $< $(OBJS) $(LDLIBS)
+%: %.c $(C_OBJS)
+	$(CC) $(CFLAGS) -o $@ $< $(C_OBJS) $(LDLIBS)
 
-common/%.o: common/%.c $(DEPS)
-	$(CC) $(CFLAGS) -c -o $@ $<
+DEPFILES := $(C_OBJS:.o=.d) $(EXECS:%=%.d)
+-include $(DEPFILES)
 
 clean: 
-	rm -f $(EXECS) $(OBJS)
+	rm -f $(EXECS) $(C_OBJS) $(DEPFILES)

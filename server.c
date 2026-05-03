@@ -79,6 +79,7 @@ int main(int argc, char **argv) {
     }
     printf("Client connected: ");
     printlen(msg.name, msg.name_len);
+    printf("\n");
 
     // The server starts by sending an upload to the client unless the client
     // explicitly requests otherwise

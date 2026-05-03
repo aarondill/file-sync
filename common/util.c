@@ -73,3 +73,13 @@ ssize_t read_message(int fd, uint8_t *buf, size_t max) {
   assert(ret == len);
   return ret;
 }
+
+void printhex(const uint8_t *buf, size_t len) {
+  for (size_t i = 0; i < len; i++)
+    printf("%02x", buf[i]);
+  printf("\n");
+}
+void printlen(const char *x, size_t len) {
+  for (size_t i = 0; i < len; i++)
+    printf("%c", x[i]);
+}

@@ -8,7 +8,7 @@
 #include <string.h>
 #define BUFSIZE 4096
 
-void respond_download(int sockfd, const file_list *recvlist) {
+bool respond_download(int sockfd, const file_list *recvlist) {
   // construct the response
   size_t file_count = file_list_len(recvlist);
   assert(file_count <= 255); // this is a protocol limit
@@ -28,18 +28,21 @@ void respond_download(int sockfd, const file_list *recvlist) {
     size_t len = serialize_download_response(buf, sizeof(buf), &resp, &err);
     if (err) {
       error("error serializing download response\n");
-      return;
+      return false;
     }
     if (!write_message(sockfd, buf, len)) {
       error("error sending download response\n");
-      return;
+      return false;
     }
   }
+  return true;
 }
 
 // NOTE: does *not* read the file contents
-file_list *read_file_list(int fd, size_t file_count) {
-  file_list *list = NULL, **tail = &list;
+// *list must be NULL
+bool read_file_list(int fd, size_t file_count, file_list **list) {
+  assert(*list == NULL);
+  file_list **tail = list;
   // recv the file info
   uint8_t buf[BUFSIZE];
   for (size_t i = 0; i < file_count; i++) {
@@ -48,24 +51,29 @@ file_list *read_file_list(int fd, size_t file_count) {
       ssize_t n = read_message(fd, buf, sizeof(buf));
       if (n < 0) {
         error("error reading download file");
-        return NULL;
+        goto cleanup;
       }
       serror_t err = 0;
       deserialize_download_file(&f, buf, n, &err);
       if (err) {
         error("error deserializing download file");
-        return NULL;
+        goto cleanup;
       }
     }
     file_list *new = file_list_new(f.name, f.name_len, f.size, f.hash);
     *tail = new;
     tail = &new->next;
   }
-  assert(file_count == file_list_len(list));
-  return list;
+  assert(file_count == file_list_len(*list));
+  return true;
+
+cleanup:
+  file_list_free(*list);
+  *list = NULL;
+  return false;
 }
 
-file_list *read_download_message(int fd, download_m *msg) {
+bool read_download_message(int fd, download_m *msg, file_list **recvlist) {
   { // recv download message
     uint8_t buf[BUFSIZE];
     ssize_t n = read_message(fd, buf, sizeof(buf));
@@ -79,19 +87,18 @@ file_list *read_download_message(int fd, download_m *msg) {
       return NULL;
     }
   }
-  file_list *recvlist = read_file_list(fd, msg->file_count);
-  return recvlist;
+  return read_file_list(fd, msg->file_count, recvlist);
 }
 
-void download(int sockfd, const file_list *files) {
+bool download(int sockfd, const file_list *files) {
   //  read the download message
   download_m msg = {0};
-  file_list *recvlist = read_download_message(sockfd, &msg);
-  if (!recvlist) {
+  file_list *recvlist = NULL;
+  if (!read_download_message(sockfd, &msg, &recvlist)) {
     // abort if interrupted (to allow an upload to be started)
     if (errno != EINTR)
       perror("read_download_message");
-    return;
+    return false;
   }
 
   { // filter the recv list to exclude anything that we already have
@@ -109,13 +116,20 @@ void download(int sockfd, const file_list *files) {
   }
 
   // send download response
-  respond_download(sockfd, recvlist);
+  if (!respond_download(sockfd, recvlist)) {
+    error("error sending download response");
+    return false;
+  }
   file_list_free(recvlist);
+  recvlist = NULL;
 
   // read download message 2
-  do {
-    recvlist = read_download_message(sockfd, &msg);
-  } while (!recvlist && errno == EINTR); // EINTR is okay
+  while (!read_download_message(sockfd, &msg, &recvlist)) {
+    if (errno != EINTR) { // EINTR is okay
+      perror("read_download_message");
+      return false;
+    }
+  }
   file_list *iter = recvlist;
   while (iter) {
     // TODO: read the file contents
@@ -127,4 +141,5 @@ void download(int sockfd, const file_list *files) {
     iter = iter->next;
   }
   file_list_free(recvlist);
+  return true;
 }

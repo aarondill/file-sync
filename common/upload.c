@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define BUFSIZE 4096
-void write_file_list(int fd, const file_list *list, bool include_contents) {
+bool write_file_list(int fd, const file_list *list, bool include_contents) {
   // send the file info
   uint8_t buf[BUFSIZE];
   while (list) {
@@ -25,19 +25,20 @@ void write_file_list(int fd, const file_list *list, bool include_contents) {
     size_t len = serialize_download_file(buf, sizeof(buf), &f, &err);
     if (err) {
       error("error serializing download file\n");
-      return;
+      return false;
     }
     if (!write_message(fd, buf, len)) {
       error("error sending download file\n");
-      return;
+      return false;
     }
     if (include_contents) {
       // TODO: send file contents
     }
     list = list->next;
   }
+  return true;
 }
-void write_download_message(int fd, const file_list *list,
+bool write_download_message(int fd, const file_list *list,
                             bool include_contents) {
   size_t file_count = file_list_len(list);
   download_m msg = {
@@ -50,21 +51,23 @@ void write_download_message(int fd, const file_list *list,
     size_t len = serialize_download(buf, sizeof(buf), &msg, &err);
     if (err) {
       error("error serializing download message\n");
-      return;
+      return false;
     }
     if (!write_message(fd, buf, len)) {
       error("error sending download message\n");
-      return;
+      return false;
     }
   }
-  write_file_list(fd, list, include_contents);
+  return write_file_list(fd, list, include_contents);
 }
 
 // Sends an upload message to the server
-void upload(int sockfd, const file_list *files) {
+bool upload(int sockfd, const file_list *files) {
   // update the global list
   // send download message 1
-  write_download_message(sockfd, files, false);
+  if (!write_download_message(sockfd, files, false)) {
+    return false;
+  }
 
   // receive download response
   uint8_t buf[BUFSIZE];
@@ -74,7 +77,7 @@ void upload(int sockfd, const file_list *files) {
   } while (n < 0 && errno == EINTR); // EINTR is okay
   if (n < 0) {
     error("error reading download response");
-    return;
+    return false;
   }
 
   download_response_m resp;
@@ -83,7 +86,7 @@ void upload(int sockfd, const file_list *files) {
     deserialize_download_response(&resp, buf, n, &err);
     if (err) {
       error("error deserializing download response");
-      return;
+      return false;
     }
   }
 
@@ -105,6 +108,7 @@ void upload(int sockfd, const file_list *files) {
   }
 
   // send download message 2
-  write_download_message(sockfd, filtered_list, true);
+  bool succ = write_download_message(sockfd, filtered_list, true);
   file_list_free(filtered_list);
+  return succ;
 }

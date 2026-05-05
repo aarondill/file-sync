@@ -4,6 +4,7 @@
 #include "common/upload.h"
 #include "common/util.h"
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -91,16 +92,24 @@ int main(int argc, char **argv) {
 
     while (!stop) {
       if (!upload_pending) {
-        download(connfd, global_list);
+        if (!download(connfd, global_list) && errno != EINTR) {
+          error("error downloading files\n");
+          return 1;
+        }
         // TODO: mark other threads as uploading
       }
       // note: this value can change during `download`
       if (upload_pending) {
-        upload(connfd, global_list);
+        if (!upload(connfd, global_list)) {
+          error("error uploading files\n");
+          return 1;
+        }
         upload_pending = false;
       }
     }
 
     close(connfd);
   }
+  close(listenfd);
+  return 0;
 }

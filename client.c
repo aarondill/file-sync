@@ -5,6 +5,7 @@
 #include "common/util.h"
 #include <arpa/inet.h>
 #include <assert.h>
+#include <errno.h>
 #include <netdb.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -132,11 +133,18 @@ int main(int argc, char **argv) {
 
   while (!stop) {
     if (!upload_pending) {
-      download(sockfd, global_list);
+      // download may be interrupted by a signal
+      if (!download(sockfd, global_list) && errno != EINTR) {
+        error("error downloading files\n");
+        return 1;
+      }
     }
     // note: this value can change during `download`
     if (upload_pending) {
-      upload(sockfd, global_list);
+      if (!upload(sockfd, global_list)) {
+        error("error uploading files\n");
+        return 1;
+      }
       upload_pending = false;
     }
   }

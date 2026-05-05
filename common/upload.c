@@ -2,6 +2,7 @@
 #include "file_list.h"
 #include "protocol.h"
 #include "util.h"
+#include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -9,14 +10,14 @@
 #include <string.h>
 
 #define BUFSIZE 4096
-bool write_file_list(int fd, const file_list *list, bool include_contents) {
+bool write_file_list(int fd, const file_list *list, const char *srcdir) {
   // send the file info
   uint8_t buf[BUFSIZE];
   while (list) {
     download_file_m f = {
         .name_len = list->name_len,
         // must be zero if not, since there's no body
-        .size = include_contents ? list->size : 0,
+        .size = srcdir ? list->size : 0,
     };
     memcpy(f.hash, list->hash, MD5_DIGEST_LENGTH);
     memcpy(f.name, list->name, list->name_len);
@@ -31,15 +32,15 @@ bool write_file_list(int fd, const file_list *list, bool include_contents) {
       error("error sending download file\n");
       return false;
     }
-    if (include_contents) {
-      // TODO: send file contents
-    }
     list = list->next;
   }
+  if (!srcdir)
+    return true;
+  // TODO: send file contents
   return true;
 }
-bool write_download_message(int fd, const file_list *list,
-                            bool include_contents) {
+// only reads the file contents if srcdir is not NULL
+bool write_download_message(int fd, const file_list *list, const char *srcdir) {
   size_t file_count = file_list_len(list);
   download_m msg = {
       .flags = 0,
@@ -58,14 +59,15 @@ bool write_download_message(int fd, const file_list *list,
       return false;
     }
   }
-  return write_file_list(fd, list, include_contents);
+  return write_file_list(fd, list, srcdir);
 }
 
 // Sends an upload message to the server
-bool upload(int sockfd, const file_list *files) {
+bool upload(int sockfd, const file_list *files, const char *srcdir) {
+  assert(srcdir && *srcdir);
   // update the global list
   // send download message 1
-  if (!write_download_message(sockfd, files, false)) {
+  if (!write_download_message(sockfd, files, NULL)) {
     return false;
   }
 
@@ -108,7 +110,7 @@ bool upload(int sockfd, const file_list *files) {
   }
 
   // send download message 2
-  bool succ = write_download_message(sockfd, filtered_list, true);
+  bool succ = write_download_message(sockfd, filtered_list, srcdir);
   file_list_free(filtered_list);
   return succ;
 }

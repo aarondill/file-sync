@@ -1,3 +1,3 @@
 #pragma once
 #include "file_list.h"
-bool upload(int sockfd, const file_list *files);
+bool upload(int sockfd, const file_list *files, const char *srcdir);

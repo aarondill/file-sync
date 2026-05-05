@@ -68,7 +68,9 @@ Note that this may be responded with an error if there are too many clients.
     - Note: supports up to 4 GB
     - Must be zero on initial message → client responds with subset of files to download
   - File name (max of 255 bytes, variable length)
-  - File data (variable length)
+- All files data (variable length)
+  - Each file is sent in order, and the client must verify the hash
+  - total size is the sum of all file sizes
 
 Total header size is 2 bytes
 Each file header is 21 bytes

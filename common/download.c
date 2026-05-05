@@ -40,7 +40,10 @@ bool respond_download(int sockfd, const file_list *recvlist) {
 
 // NOTE: does *not* read the file contents
 // *list must be NULL
-bool read_file_list(int fd, size_t file_count, file_list **list) {
+// if include_contents is true, the file contents will be read and written to
+// disk
+bool read_file_list(int fd, size_t file_count, file_list **list,
+                    const char *destdir) {
   assert(*list == NULL);
   file_list **tail = list;
   // recv the file info
@@ -65,7 +68,12 @@ bool read_file_list(int fd, size_t file_count, file_list **list) {
     tail = &new->next;
   }
   assert(file_count == file_list_len(*list));
-  return true;
+  if (!destdir) {
+    for (file_list *iter = *list; iter; iter = iter->next)
+      assert(iter->size == 0);
+    return true;
+  }
+  // TODO: recv file contents
 
 cleanup:
   file_list_free(*list);
@@ -73,7 +81,10 @@ cleanup:
   return false;
 }
 
-bool read_download_message(int fd, download_m *msg, file_list **recvlist) {
+// if destdir is NULL, the files will not be read from the message (ie. the
+// uploader must not send the file contents)
+bool read_download_message(int fd, download_m *msg, file_list **recvlist,
+                           const char *destdir) {
   { // recv download message
     uint8_t buf[BUFSIZE];
     ssize_t n = read_message(fd, buf, sizeof(buf));
@@ -87,14 +98,14 @@ bool read_download_message(int fd, download_m *msg, file_list **recvlist) {
       return NULL;
     }
   }
-  return read_file_list(fd, msg->file_count, recvlist);
+  return read_file_list(fd, msg->file_count, recvlist, destdir);
 }
 
-bool download(int sockfd, const file_list *files) {
+bool download(int sockfd, const file_list *files, const char *destdir) {
   //  read the download message
   download_m msg = {0};
   file_list *recvlist = NULL;
-  if (!read_download_message(sockfd, &msg, &recvlist)) {
+  if (!read_download_message(sockfd, &msg, &recvlist, NULL)) {
     // abort if interrupted (to allow an upload to be started)
     if (errno != EINTR)
       perror("read_download_message");
@@ -124,7 +135,7 @@ bool download(int sockfd, const file_list *files) {
   recvlist = NULL;
 
   // read download message 2
-  while (!read_download_message(sockfd, &msg, &recvlist)) {
+  while (!read_download_message(sockfd, &msg, &recvlist, destdir)) {
     if (errno != EINTR) { // EINTR is okay
       perror("read_download_message");
       return false;
@@ -132,7 +143,7 @@ bool download(int sockfd, const file_list *files) {
   }
   file_list *iter = recvlist;
   while (iter) {
-    // TODO: read the file contents
+    // TODO: write the file contents
     printf("recv: ");
     printlen(iter->name, iter->name_len);
     printf(" ");

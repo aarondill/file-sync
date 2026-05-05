@@ -18,8 +18,12 @@
 // #define MAXUSERS 100
 // TODO: multithreading. Keep a list of tids and use pthread_kill to signal an
 // upload
-// TODO: use a rwlock on global_list
 file_list *global_list = NULL;
+void update_list(const char *directory) {
+  // TODO: use a rwlock on global_list
+  file_list_free(global_list);
+  global_list = file_list_read(directory);
+}
 // TODO: make array (bool per thread) of upload_pending
 volatile bool upload_pending = false;
 volatile bool stop = false;
@@ -94,7 +98,11 @@ int main(int argc, char **argv) {
 
     while (!stop) {
       if (!upload_pending) {
-        if (!download(connfd, global_list) && errno != EINTR) {
+        if (download(connfd, global_list, directory)) {
+          // NOTE: don't update on interupt, since the interrupting thread
+          // should have already updated it
+          update_list(directory);
+        } else if (errno != EINTR) {
           error("error downloading files\n");
           return 1;
         }
@@ -102,7 +110,7 @@ int main(int argc, char **argv) {
       }
       // note: this value can change during `download`
       if (upload_pending) {
-        if (!upload(connfd, global_list)) {
+        if (!upload(connfd, global_list, directory)) {
           error("error uploading files\n");
           return 1;
         }

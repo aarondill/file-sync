@@ -69,10 +69,15 @@ client_connect_m init_connect_msg(const char *name, bool upload) {
   return msg;
 }
 
-// No locking is required here, since the client is single-threaded
-file_list *global_list = NULL;
 volatile bool upload_pending = false;
 volatile bool stop = false;
+
+// No locking is required here, since the client is single-threaded
+file_list *global_list = NULL;
+void update_list(const char *directory) {
+  file_list_free(global_list);
+  global_list = file_list_read(directory);
+}
 
 void signal_handler(int signum) {
   if (signum == SIGUSR1) {
@@ -134,14 +139,18 @@ int main(int argc, char **argv) {
   while (!stop) {
     if (!upload_pending) {
       // download may be interrupted by a signal
-      if (!download(sockfd, global_list) && errno != EINTR) {
+      if (download(sockfd, global_list, directory) || errno == EINTR) {
+        // update the list on a successful download or on interrupt (so the
+        // following upload is valid, since files may have changed)
+        update_list(directory);
+      } else if (errno != EINTR) {
         error("error downloading files\n");
         return 1;
       }
     }
     // note: this value can change during `download`
     if (upload_pending) {
-      if (!upload(sockfd, global_list)) {
+      if (!upload(sockfd, global_list, directory)) {
         error("error uploading files\n");
         return 1;
       }

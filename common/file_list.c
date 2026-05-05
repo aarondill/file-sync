@@ -2,6 +2,7 @@
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
+#include <errno.h>
 #include <linux/limits.h>
 #include <md5.h>
 #include <stdint.h>
@@ -30,44 +31,79 @@ uint8_t *hash_file(const char *filename, uint8_t *hash) {
   return hash;
 }
 
-// fill the list with the recursive contents of the directory at path
-file_list *file_list_read(const char *path) {
+// returns a string containing the next file in the directory. Skips . and ..
+// Do not free the returned string. It will change as you call this function.
+// Returns NULL if there are no more files in the directory or if an error
+// occurs.
+char *read_dir(DIR *dir, const char *dirpath) {
+  static char buf[PATH_MAX] = {0};
+  if (strlen(dirpath) > sizeof(buf) - 2) { // 2 for the slash and null
+    errno = ENAMETOOLONG;
+    return NULL;
+  }
+  strcpy(buf, dirpath);
+  strcat(buf, "/");
+
+  char *d_name;
+  do {
+    struct dirent *ent = readdir(dir);
+    if (!ent)
+      return NULL;
+    d_name = ent->d_name;
+  } while (!strcmp(d_name, ".") || !strcmp(d_name, "..")); // skip . and ..
+  if (strlen(d_name) > sizeof(buf) - 1) {
+    errno = ENAMETOOLONG;
+    return NULL;
+  }
+  strcat(buf, d_name);
+  return buf;
+}
+
+// buf should be used to create the relative path to the file
+file_list *file_list_read_impl(const char *path, char *buf, size_t buflen) {
   DIR *dir = opendir(path);
   if (!dir)
     return NULL;
-  file_list *list = NULL;
-  struct dirent *ent;
   struct stat st;
   uint8_t hash[MD5_DIGEST_LENGTH];
+  file_list *list = NULL;
 
-  char pathbuf[255] = {0};
-  char *dirend = pathbuf + snprintf(pathbuf, sizeof(pathbuf), "%s/", path);
-  size_t path_len = sizeof(pathbuf) - (dirend - pathbuf);
-  while ((ent = readdir(dir))) {
-    // skip . and ..
-    if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
+  // after function call, memset everything after bufend to 0
+  char *bufend = buf + strlen(buf);
+  size_t buf_rem = buflen - (bufend - buf);
+
+  char *p;
+  while ((p = read_dir(dir, path))) {
+    if (lstat(p, &st))
       continue;
-    if (strlen(ent->d_name) + 1 > path_len) {
-      warn("path too long: %s/%s", path, ent->d_name);
+
+    // add last component of path to buf
+    char *last_slash = strrchr(p, '/');
+    assert(last_slash);
+    if (strlen(last_slash) + 1 > buf_rem) {
+      warn("path too long: %s/%s", path, last_slash);
       continue;
     }
-    strcpy(dirend, ent->d_name);
-    ent = NULL; // no more of this
-    if (lstat(pathbuf, &st))
-      continue;
+    strcat(bufend, last_slash);
 
     if (S_ISDIR(st.st_mode)) {
-      file_list_append(&list, file_list_read(pathbuf));
+      file_list_append(&list, file_list_read_impl(p, buf, buflen));
     } else if (S_ISREG(st.st_mode)) {
-      file_list_append(&list,
-                       file_list_new(pathbuf, strlen(pathbuf), st.st_size,
-                                     hash_file(pathbuf, hash)));
+      file_list_append(&list, file_list_new(buf, strlen(buf), st.st_size,
+                                            hash_file(p, hash)));
     } else {
-      warn("unknown file type: %s", pathbuf);
+      warn("unknown file type: %s", p);
     }
+    memset(bufend, 0, buf_rem); // remove the path
   }
   closedir(dir);
+
   return list;
+}
+// fill the list with the recursive contents of the directory at path
+file_list *file_list_read(const char *path) {
+  char buf[256] = {0}; // 256 because 255 + 1 for the null
+  return file_list_read_impl(path, buf, sizeof(buf));
 }
 
 void file_list_append(file_list **list, file_list *to_insert) {

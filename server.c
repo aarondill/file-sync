@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
     perror("socket");
     return 1;
   }
+  // set SO_REUSEADDR to make debugging easier
+  setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 
   struct sockaddr_in serv_addr = {
       .sin_addr.s_addr = htonl(INADDR_ANY),

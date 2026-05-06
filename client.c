@@ -129,8 +129,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  file_list_free(global_list);
-  global_list = file_list_read(directory);
+  update_list(directory);
 
   if (should_upload)
     upload_pending = true;

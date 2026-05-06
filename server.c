@@ -44,6 +44,10 @@ int main(int argc, char **argv) {
     port = atoi(argv[2]);
   }
   char *directory = argv[1];
+  if (access(directory, R_OK | W_OK)) {
+    error("directory %s is not readable or writable\n", directory);
+    return 3;
+  }
 
   int listenfd = socket(AF_INET, SOCK_STREAM, 0);
   if (listenfd < 0) {

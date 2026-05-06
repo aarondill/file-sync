@@ -106,6 +106,10 @@ int main(int argc, char **argv) {
   }
   char *server = argv[optind]; // name:port; name may be host or IP
   char *directory = argv[optind + 1];
+  if (access(directory, R_OK | W_OK)) {
+    error("directory %s is not readable or writable\n", directory);
+    return 3;
+  }
 
   int sockfd = init_connection(server);
 

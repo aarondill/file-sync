@@ -105,6 +105,11 @@ int main(int argc, char **argv) {
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGQUIT, &sa, NULL);
+    // block SIGPIPE
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     while (!stop) {
       if (!upload_pending) {

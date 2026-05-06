@@ -84,28 +84,27 @@ bool read_file_list(int fd, size_t file_count, file_list **list,
     tail = &new->next;
   }
   assert(file_count == file_list_len(*list));
-  if (!destdir) {
+  if (destdir) {
+    file_list *iter = *list;
+    while (iter) {
+      char path[PATH_MAX] = {0};
+      snprintf(path, sizeof(path), "%s/%s", destdir, iter->name);
+      mkdir_p(path);
+      int file_fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (file_fd < 0)
+        fatal("error opening file for writing: %s\n", path);
+      printf("receiving %s\n", path);
+      bool succ = transfer_bytes(file_fd, fd, iter->size);
+      close(file_fd);
+      if (!succ)
+        fatal("error receiving file contents\n");
+      iter = iter->next;
+    }
+  } else {
     for (file_list *iter = *list; iter; iter = iter->next)
       assert(iter->size == 0);
-    return true;
   }
-  file_list *iter = *list;
-  while (iter) {
-    char path[PATH_MAX] = {0};
-    snprintf(path, sizeof(path), "%s/%s", destdir, iter->name);
-    mkdir_p(path);
-    int file_fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (file_fd < 0) {
-      error("error opening file for writing: %s\n", path);
-      return false;
-    }
-    printf("receiving %s\n", path);
-    bool succ = transfer_bytes(file_fd, fd, iter->size);
-    close(file_fd);
-    if (!succ)
-      fatal("error receiving file contents\n");
-    iter = iter->next;
-  }
+  return true;
 
 cleanup:
   file_list_free(*list);

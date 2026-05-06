@@ -4,39 +4,60 @@
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <linux/limits.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <unistd.h>
 #define BUFSIZE 4096
+
 bool write_file_list(int fd, const file_list *list, const char *srcdir) {
   // send the file info
   uint8_t buf[BUFSIZE];
-  while (list) {
-    download_file_m f = {
-        .name_len = list->name_len,
-        // must be zero if not, since there's no body
-        .size = srcdir ? list->size : 0,
-    };
-    memcpy(f.hash, list->hash, MD5_DIGEST_LENGTH);
-    memcpy(f.name, list->name, list->name_len);
+  {
+    const file_list *node = list;
+    while (node) {
+      download_file_m f = {
+          .name_len = node->name_len,
+          // must be zero if not, since there's no body
+          .size = srcdir ? node->size : 0,
+      };
+      memcpy(f.hash, node->hash, MD5_DIGEST_LENGTH);
+      memcpy(f.name, node->name, node->name_len);
 
-    serror_t err = 0;
-    size_t len = serialize_download_file(buf, sizeof(buf), &f, &err);
-    if (err) {
-      error("error serializing download file\n");
-      return false;
+      serror_t err = 0;
+      size_t len = serialize_download_file(buf, sizeof(buf), &f, &err);
+      if (err) {
+        error("error serializing download file\n");
+        return false;
+      }
+      if (!write_message(fd, buf, len)) {
+        error("error sending download file\n");
+        return false;
+      }
+      node = node->next;
     }
-    if (!write_message(fd, buf, len)) {
-      error("error sending download file\n");
-      return false;
-    }
-    list = list->next;
   }
-  if (!srcdir)
-    return true;
-  // TODO: send file contents
+
+  if (srcdir) { // send file contents
+    char path[PATH_MAX] = {0};
+    while (list) {
+      snprintf(path, sizeof(path), "%s/%s", srcdir, list->name);
+      int file_fd = open(path, O_RDONLY);
+      if (file_fd < 0) {
+        error("error opening file for reading: %s\n", path);
+        return false;
+      }
+      bool succ = transfer_bytes(fd, file_fd, list->size);
+      close(file_fd);
+      if (!succ)
+        fatal("error sending file contents\n");
+      list = list->next;
+    }
+  }
   return true;
 }
 // only reads the file contents if srcdir is not NULL

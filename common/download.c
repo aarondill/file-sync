@@ -1,12 +1,28 @@
-// This function takes ownership of the recvlist !
 #include "file_list.h"
 #include "protocol.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <linux/limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #define BUFSIZE 4096
+
+void mkdir_p(const char *dir_path) {
+  char *path = strdup(dir_path);
+  char *q = path; // find each '/'
+  while ((q = strchr(q, '/'))) {
+    *q = '\0';
+    if (mkdir(path, 0755) < 0 && errno != EEXIST)
+      fatal("error creating directory: %s\n", path);
+    *q++ = '/';
+  }
+  free(path);
+}
 
 bool respond_download(int sockfd, const file_list *recvlist) {
   // construct the response
@@ -73,7 +89,24 @@ bool read_file_list(int fd, size_t file_count, file_list **list,
       assert(iter->size == 0);
     return true;
   }
-  // TODO: recv file contents
+  file_list *iter = *list;
+  while (iter) {
+    char path[PATH_MAX] = {0};
+    snprintf(path, sizeof(path), "%s/%s", destdir, iter->name);
+    mkdir_p(dirname(path)); // dirname modifies the string
+    snprintf(path, sizeof(path), "%s/%s", destdir, iter->name);
+    int file_fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (file_fd < 0) {
+      error("error opening file for writing: %s\n", path);
+      return false;
+    }
+    printf("receiving %s\n", path);
+    bool succ = transfer_bytes(file_fd, fd, iter->size);
+    close(file_fd);
+    if (!succ)
+      fatal("error receiving file contents\n");
+    iter = iter->next;
+  }
 
 cleanup:
   file_list_free(*list);

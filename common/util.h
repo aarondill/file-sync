@@ -29,3 +29,5 @@ ssize_t read_message(int fd, uint8_t *buf, size_t max);
 
 void printhex(const uint8_t *buf, size_t len);
 void printlen(const char *x, size_t len);
+
+bool transfer_bytes(int out, int in, size_t size);

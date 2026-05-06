@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
+#define BUFSIZE 4096
 
 bool write_all(int fd, const uint8_t *buf, size_t len) {
   size_t written = 0;
@@ -82,4 +83,30 @@ void printhex(const uint8_t *buf, size_t len) {
 void printlen(const char *x, size_t len) {
   for (size_t i = 0; i < len; i++)
     printf("%c", x[i]);
+}
+
+// sends size bytes from in to out
+// aborts if there is not size bytes available
+bool transfer_bytes(int out, int in, size_t size) {
+  uint8_t buf[BUFSIZE];
+  size_t rem = size;
+  while (rem > 0) {
+    size_t to_read = rem > sizeof(buf) ? sizeof(buf) : rem;
+    ssize_t n = read(in, buf, to_read);
+    if (n == 0)
+      fatal("not enough data\n");
+    else if (n < 0) {
+      // if interrupted, keep going
+      if (errno != EINTR)
+        return false;
+      else
+        continue;
+    }
+    if (!write_all(out, buf, n)) {
+      error("error sending bytes\n");
+      return false;
+    }
+    rem -= n;
+  }
+  return true;
 }

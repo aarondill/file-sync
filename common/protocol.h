@@ -1,5 +1,5 @@
 #pragma once
-#include <md5.h>
+#include <openssl/md5.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

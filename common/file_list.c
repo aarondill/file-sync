@@ -4,7 +4,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <linux/limits.h>
-#include <md5.h>
+#include <openssl/md5.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,16 +18,16 @@ uint8_t *hash_file(const char *filename, uint8_t *hash) {
     return NULL;
 
   MD5_CTX ctx;
-  MD5Init(&ctx);
+  MD5_Init(&ctx);
 
   uint8_t data[1024];
   size_t bytes;
   while ((bytes = fread(data, 1, sizeof(data), fp)) > 0) {
-    MD5Update(&ctx, data, bytes);
+    MD5_Update(&ctx, data, bytes);
   }
   fclose(fp);
 
-  MD5Final(hash, &ctx);
+  MD5_Final(hash, &ctx);
   return hash;
 }
 

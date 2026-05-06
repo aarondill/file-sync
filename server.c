@@ -113,7 +113,7 @@ void *client_thread(void *arg) {
 
   // The server starts by sending an upload to the client unless the client
   // explicitly requests otherwise
-  if (msg.flags & INTENT_TO_UPLOAD) {
+  if (!(msg.flags & INTENT_TO_UPLOAD)) {
     uint8_t buf[1] = {0};
     write_all(client->pipewfd, buf, 1); // write to initiate an upload
   }

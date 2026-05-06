@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -20,6 +21,7 @@
 
 typedef struct client_list client_list;
 typedef struct client_info client_info;
+pthread_rwlock_t rwlock_clients = PTHREAD_RWLOCK_INITIALIZER;
 struct client_list {
   const struct client_info {
     const int connfd;
@@ -41,38 +43,46 @@ client_list *add_client(int connfd) {
   client_info ci = {
       .connfd = connfd, .piperfd = pipefds[0], .pipewfd = pipefds[1]};
 
-  // TODO: lock the client_list
-  memcpy(client, // use memcpy to solve the const problem
-         &(client_list){.info = ci, .next = clients}, sizeof(client_list));
-  clients = client;
-  // TODO: unlock the client_list
+  pthread_rwlock_wrlock(&rwlock_clients);
+  // use memcpy to solve the const problem
+  clients = memcpy(client, &(client_list){.info = ci, .next = clients},
+                   sizeof(client_list));
+  pthread_rwlock_unlock(&rwlock_clients);
 
   return client;
 }
 void remove_client(const client_info *client) {
-  // TODO: lock the client_list
+  pthread_rwlock_wrlock(&rwlock_clients);
   client_list **cur = &clients;
   // find the client info in the list (must be unique)
   while (*cur && &(*cur)->info != client)
     cur = &(*cur)->next;
-  if (!*cur) {
-    warn("client not found\n");
-    return;
-  }
+  assert(*cur); // undefined behavior if client not in list
   client_list *tmp = *cur;
   *cur = (*cur)->next;
-  // TODO: unlock the client_list
+  pthread_rwlock_unlock(&rwlock_clients);
   close(client->connfd);
   close(client->piperfd);
   close(client->pipewfd);
   free(tmp);
 }
+// writes a single byte to all clients except the one specified
+void write_other_clients(const client_info *connfd) {
+  pthread_rwlock_rdlock(&rwlock_clients);
+  uint8_t buf[1] = {0};
+  for (client_list *cur = clients; cur; cur = cur->next)
+    if (&cur->info != connfd)
+      write_all(cur->info.pipewfd, buf, 1);
+  pthread_rwlock_unlock(&rwlock_clients);
+}
 
+pthread_rwlock_t rwlock_files = PTHREAD_RWLOCK_INITIALIZER;
 file_list *global_list = NULL;
 void update_list(const char *directory) {
-  // TODO: use a rwlock on global_list
+  pthread_rwlock_wrlock(&rwlock_files);
   file_list_free(global_list);
   global_list = file_list_read(directory);
+  pthread_rwlock_unlock(&rwlock_files);
 }
 
 volatile bool stop = false;
@@ -86,47 +96,74 @@ const char *directory = NULL;
 
 void *client_thread(void *arg) {
   const client_info *client = arg;
-  uint8_t buf[BUFSIZE];
-  read_message(client->connfd, buf, sizeof(buf));
-  serror_t err = 0;
   client_connect_m msg = {0};
-  deserialize_client_connect(&msg, buf, sizeof(buf), &err);
-  if (err) {
-    error("error deserializing client connect message\n");
-    goto cleanup;
+  { // read the client connect message
+    uint8_t buf[BUFSIZE];
+    read_message(client->connfd, buf, sizeof(buf));
+    serror_t err = 0;
+    deserialize_client_connect(&msg, buf, sizeof(buf), &err);
+    if (err) {
+      error("error deserializing client connect message\n");
+      goto cleanup;
+    }
+    printf("Client connected: ");
+    printlen(msg.name, msg.name_len);
+    printf("\n");
   }
-  printf("Client connected: ");
-  printlen(msg.name, msg.name_len);
-  printf("\n");
 
   // The server starts by sending an upload to the client unless the client
   // explicitly requests otherwise
   if (msg.flags & INTENT_TO_UPLOAD) {
-    // TODO: write to pipewfd
+    uint8_t buf[1] = {0};
+    write_all(client->pipewfd, buf, 1); // write to initiate an upload
   }
 
-  while (!stop) {
-    bool upload_pending = false; // TODO: read from piperfd
-    if (!upload_pending) {
-      // TODO: select() on connfd and piperfd
+  const int CONNIND = 0, PIPEIND = 1;
+  struct pollfd pfds[2] = {
+      {.fd = client->connfd, .events = POLL_IN},
+      {.fd = client->piperfd, .events = POLL_IN},
+  };
 
-      if (download(client->connfd, global_list, directory)) {
-        // NOTE: don't update on interupt, since the interrupting thread
-        // should have already updated it
+  while (!stop) {
+    int ret = poll(pfds, 2, -1);
+    assert(ret != 0); // no timeout, so this should be true
+    if (ret < 0) {
+      if (errno == EINTR)
+        continue;
+      perror("poll");
+      goto cleanup;
+    }
+    if (pfds[PIPEIND].revents & POLLIN) { // pipe has data, should upload
+      if (pfds[CONNIND].revents & POLLIN) {
+        error("both pipe and conn have data!\n");
+        goto cleanup;
+      }
+      pthread_rwlock_rdlock(&rwlock_files);
+      bool success = upload(client->connfd, global_list, directory);
+      pthread_rwlock_unlock(&rwlock_files);
+      if (!success) {
+        error("error uploading files\n");
+        goto cleanup;
+      }
+      char buf[1024];
+      while (read(client->piperfd, buf, sizeof(buf)) > 0) // empty the pipe
+        ;
+    } else if (pfds[CONNIND].revents &
+               POLLIN) { // conn has data, should download
+
+      pthread_rwlock_rdlock(&rwlock_files);
+      bool success = download(client->connfd, global_list, directory);
+      pthread_rwlock_unlock(&rwlock_files);
+      if (success) {
         update_list(directory);
+        write_other_clients(client);
       } else if (errno != EINTR) {
         error("error downloading files\n");
         goto cleanup;
       }
-      // TODO: mark other threads as uploading
-    }
-    // note: this value can change during `download`
-    if (upload_pending) {
-      if (!upload(client->connfd, global_list, directory)) {
-        error("error uploading files\n");
-        goto cleanup;
-      }
-      upload_pending = false;
+    } else {
+      error("neither pipe nor conn has data!\n"); // how'd we get here?
+      goto cleanup;
     }
   }
 
@@ -189,14 +226,13 @@ int main(int argc, char **argv) {
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
   while (!stop) {
-    // TODO: create a thread here for dedicated server
     int connfd = accept(listenfd, NULL, NULL);
     if (connfd < 0) {
       perror("accept");
       return 1;
     }
     client_list *client = add_client(connfd);
-    pthread_t tid; // TODO: use pthread_create
+    pthread_t tid;
     if (pthread_create(&tid, NULL, client_thread, (void *)&client->info)) {
       perror("pthread_create");
       return 1;

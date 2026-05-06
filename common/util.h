@@ -1,4 +1,5 @@
 #pragma once
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -25,7 +26,7 @@ ssize_t read_message(int fd, uint8_t *buf, size_t max);
 #define fatal(...)                                                             \
   do {                                                                         \
     _print("fatal: ", ##__VA_ARGS__);                                          \
-    exit(1);                                                                   \
+    pthread_exit(NULL);                                                        \
   } while (0)
 
 void printhex(const uint8_t *buf, size_t len);

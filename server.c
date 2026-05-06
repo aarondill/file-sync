@@ -145,9 +145,8 @@ void *client_thread(void *arg) {
         error("error uploading files\n");
         goto cleanup;
       }
-      char buf[1024];
-      while (read(client->piperfd, buf, sizeof(buf)) > 0) // empty the pipe
-        ;
+      char buf[1];
+      read(client->piperfd, &buf, sizeof(buf)); // empty the pipe
     } else if (pfds[CONNIND].revents &
                POLLIN) { // conn has data, should download
 

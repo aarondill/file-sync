@@ -6,7 +6,7 @@
 struct file_list {
   size_t name_len;
   // Note: name is relative to the directory the file_list was read from
-  char name[255];
+  char name[256];
   uint8_t hash[16];
   size_t size;
   struct file_list *next;

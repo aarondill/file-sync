@@ -180,7 +180,8 @@ file_list *file_list_new(const char *name, size_t name_len, size_t size,
   file_list *new = malloc(sizeof(file_list));
   if (!new)
     return NULL;
-  assert(name_len < sizeof(new->name));
+  if (name_len > sizeof(new->name) - 1)
+    fatal("name too long: %s", name);
   *new = (file_list){
       .name_len = name_len,
       .name = {0},

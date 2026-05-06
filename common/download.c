@@ -108,8 +108,7 @@ bool read_file_list(int fd, size_t file_count, file_list **list,
 
   assert(file_count == file_list_len(*list));
   if (destdir) { // recv/write the file contents
-    file_list *iter = *list;
-    while (iter) {
+    for (file_list *iter = *list; iter; iter = iter->next) {
       char path[PATH_MAX] = {0};
       snprintf(path, sizeof(path), "%s/%s", destdir, iter->name);
       mkdir_p(path);
@@ -124,7 +123,6 @@ bool read_file_list(int fd, size_t file_count, file_list **list,
       close(file_fd);
       if (!succ)
         fatal("error receiving file contents\n");
-      iter = iter->next;
     }
   } else {
     for (file_list *iter = *list; iter; iter = iter->next)

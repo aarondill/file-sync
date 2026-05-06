@@ -131,39 +131,30 @@ void file_list_insert(file_list **node, file_list *to_insert) {
 }
 
 const file_list *file_list_find(const file_list *list, file_list *node) {
-  while (list) {
+  for (; list; list = list->next)
     if (!memcmp(list->hash, node->hash, MD5_DIGEST_LENGTH) &&
-        !strncmp(list->name, node->name, node->name_len)) {
+        !strncmp(list->name, node->name, node->name_len))
       return list;
-    }
-    list = list->next;
-  }
   return NULL;
 }
 const file_list *file_list_find_path(const file_list *list, const char *path) {
-  while (list) {
+  for (; list; list = list->next)
     if (!strncmp(list->name, path, list->name_len))
       return list;
-    list = list->next;
-  }
   return NULL;
 }
 const file_list *file_list_find_hash(const file_list *list,
                                      const uint8_t *hash) {
-  while (list) {
+  for (; list; list = list->next)
     if (!memcmp(list->hash, hash, MD5_DIGEST_LENGTH))
       return list;
-    list = list->next;
-  }
   return NULL;
 }
 
 size_t file_list_len(const file_list *list) {
   size_t len = 0;
-  while (list) {
+  for (; list; list = list->next)
     len++;
-    list = list->next;
-  }
   return len;
 }
 file_list *file_list_dup_node(const file_list *node) {
@@ -175,10 +166,10 @@ file_list *file_list_dup_node(const file_list *node) {
 
 file_list *file_list_dup(const file_list *list) {
   file_list *dup = NULL;
-  while (list) {
-    dup = file_list_dup_node(list);
-    dup->next = dup;
-    list = list->next;
+  file_list **tail = &dup;
+  for (; list; list = list->next) {
+    *tail = file_list_dup_node(list);
+    tail = &(*tail)->next;
   }
   return dup;
 }
@@ -203,10 +194,9 @@ file_list *file_list_new(const char *name, size_t name_len, size_t size,
 }
 
 void file_list_free(file_list *list) {
-  file_list *next = list;
-  while (next) {
-    file_list *tmp = next;
-    next = next->next;
+  while (list) {
+    file_list *tmp = list;
+    list = list->next;
     free(tmp);
   }
 }

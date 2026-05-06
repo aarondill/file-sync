@@ -18,8 +18,7 @@ bool write_file_list(int fd, const file_list *list, const char *srcdir) {
   // send the file info
   uint8_t buf[BUFSIZE];
   {
-    const file_list *node = list;
-    while (node) {
+    for (const file_list *node = list; node; node = node->next) {
       download_file_m f = {
           .name_len = node->name_len,
           // must be zero if not, since there's no body
@@ -38,24 +37,22 @@ bool write_file_list(int fd, const file_list *list, const char *srcdir) {
         error("error sending download file\n");
         return false;
       }
-      node = node->next;
     }
   }
 
   if (srcdir) { // send file contents
     char path[PATH_MAX] = {0};
-    while (list) {
-      snprintf(path, sizeof(path), "%s/%s", srcdir, list->name);
+    for (const file_list *node = list; node; node = node->next) {
+      snprintf(path, sizeof(path), "%s/%s", srcdir, node->name);
       int file_fd = open(path, O_RDONLY);
       if (file_fd < 0) {
         error("error opening file for reading: %s\n", path);
         return false;
       }
-      bool succ = transfer_bytes(fd, file_fd, list->size);
+      bool succ = transfer_bytes(fd, file_fd, node->size);
       close(file_fd);
       if (!succ)
         fatal("error sending file contents\n");
-      list = list->next;
     }
   }
   return true;

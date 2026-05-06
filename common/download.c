@@ -96,8 +96,11 @@ bool read_file_list(int fd, size_t file_count, file_list **list,
       int file_fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
       if (file_fd < 0)
         fatal("error opening file for writing: %s\n", path);
-      printf("receiving %s\n", path);
+      printf("receiving %s: ", path);
+      printhex(iter->hash, MD5_DIGEST_LENGTH);
+      printf("\n");
       bool succ = transfer_bytes(file_fd, fd, iter->size);
+      // TODO: verify hash (?)
       close(file_fd);
       if (!succ)
         fatal("error receiving file contents\n");
@@ -176,16 +179,6 @@ bool download(int sockfd, const file_list *files, const char *destdir) {
       perror("read_download_message");
       return false;
     }
-  }
-  file_list *iter = recvlist;
-  while (iter) {
-    // TODO: write the file contents
-    printf("recv: ");
-    printlen(iter->name, iter->name_len);
-    printf(" ");
-    printhex(iter->hash, MD5_DIGEST_LENGTH);
-    printf("\n");
-    iter = iter->next;
   }
   file_list_free(recvlist);
   return true;

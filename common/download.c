@@ -61,30 +61,33 @@ bool respond_download(int sockfd, const file_list *recvlist) {
 bool read_file_list(int fd, size_t file_count, file_list **list,
                     const char *destdir) {
   assert(*list == NULL);
-  file_list **tail = list;
-  // recv the file info
-  uint8_t buf[BUFSIZE];
-  for (size_t i = 0; i < file_count; i++) {
-    download_file_m f = {0};
-    { // read file info
-      ssize_t n = read_message(fd, buf, sizeof(buf));
-      if (n < 0) {
-        error("error reading download file");
-        goto cleanup;
+
+  { // recv the file info
+    uint8_t buf[BUFSIZE];
+    file_list **tail = list;
+    for (size_t i = 0; i < file_count; i++) {
+      download_file_m f = {0};
+      { // read file info
+        ssize_t n = read_message(fd, buf, sizeof(buf));
+        if (n < 0) {
+          error("error reading download file");
+          goto cleanup;
+        }
+        serror_t err = 0;
+        deserialize_download_file(&f, buf, n, &err);
+        if (err) {
+          error("error deserializing download file");
+          goto cleanup;
+        }
       }
-      serror_t err = 0;
-      deserialize_download_file(&f, buf, n, &err);
-      if (err) {
-        error("error deserializing download file");
-        goto cleanup;
-      }
+      file_list *new = file_list_new(f.name, f.name_len, f.size, f.hash);
+      *tail = new;
+      tail = &new->next;
     }
-    file_list *new = file_list_new(f.name, f.name_len, f.size, f.hash);
-    *tail = new;
-    tail = &new->next;
   }
+
   assert(file_count == file_list_len(*list));
-  if (destdir) {
+  if (destdir) { // recv/write the file contents
     file_list *iter = *list;
     while (iter) {
       char path[PATH_MAX] = {0};

@@ -149,11 +149,13 @@ bool download(int sockfd, const file_list *files, const char *destdir) {
     while (*p) {
       // guarentee the order of the files is the same as the original
       if ((iter = file_list_find(iter, *p))) {
-        file_list *tmp = *p; // remove p from recvlist
-        *p = (*p)->next;
+        // remove p from recvlist
+        file_list *tmp = *p;
+        *p = (*p)->next; // move next back
         free(tmp);
+      } else {
+        p = &(*p)->next; // move p forward
       }
-      p = &(*p)->next;
     }
   }
 

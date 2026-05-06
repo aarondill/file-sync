@@ -33,6 +33,8 @@ ssize_t read_all(int fd, uint8_t *buf, size_t min, size_t max) {
       to_read = min;
     ssize_t ret = read(fd, buf + got, to_read);
     if (ret <= 0) {
+      if (ret == 0)
+        errno = EIO;
       // if we read something, keep going
       if (errno == EINTR && got > 0)
         continue;

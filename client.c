@@ -131,10 +131,11 @@ int main(int argc, char **argv) {
   if (should_upload)
     upload_pending = true;
 
-  signal(SIGUSR1, signal_handler);
-  signal(SIGTERM, signal_handler);
-  signal(SIGINT, signal_handler);
-  signal(SIGQUIT, signal_handler);
+  struct sigaction sa = {.sa_handler = signal_handler};
+  sigaction(SIGUSR1, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+  sigaction(SIGINT, &sa, NULL);
+  sigaction(SIGQUIT, &sa, NULL);
 
   while (!stop) {
     if (!upload_pending) {

@@ -76,9 +76,13 @@ int main(int argc, char **argv) {
 
   file_list_free(global_list);
   global_list = file_list_read(directory);
-  while (true) {
+  while (!stop) {
     // TODO: create a thread here for dedicated server
     int connfd = accept(listenfd, NULL, NULL);
+    if (connfd < 0) {
+      perror("accept");
+      return 1;
+    }
     uint8_t buf[BUFSIZE];
     read_message(connfd, buf, sizeof(buf));
     serror_t err = 0;
@@ -126,6 +130,8 @@ int main(int argc, char **argv) {
 
     close(connfd);
   }
+  printf("Closing server\n");
+  file_list_free(global_list);
   close(listenfd);
   return 0;
 }

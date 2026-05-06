@@ -15,6 +15,7 @@ typedef struct file_list file_list;
 
 // Returns true if the list contains a node whose hash and name match
 const file_list *file_list_find(const file_list *list, file_list *node);
+const file_list *file_list_find_path(const file_list *list, const char *path);
 const file_list *file_list_find_hash(const file_list *list,
                                      const uint8_t *hash);
 

@@ -24,6 +24,26 @@ void mkdir_p(const char *file) {
   free(path);
 }
 
+// deletes a directory and all empty parent directories (ie. rmdir -p)
+void rmdir_p(const char *path) {
+  char *p = strdup(path);
+  while (p) {
+    if (rmdir(p) < 0) {
+      if (errno == ENOTEMPTY || errno == EEXIST)
+        break; // we're done. No parents will be empty
+      if (errno != ENOENT) {
+        warn("error deleting directory: %s\n", p);
+        break;
+      }
+    }
+    char *q = strrchr(p, '/');
+    if (!q)
+      break;
+    *q = '\0'; // remove last '/'
+  }
+  free(p);
+}
+
 bool respond_download(int sockfd, const file_list *recvlist) {
   // construct the response
   size_t file_count = file_list_len(recvlist);
@@ -149,6 +169,20 @@ bool download(int sockfd, const file_list *files, const char *destdir) {
     return false;
   }
 
+  file_list *to_delete = file_list_dup(files);
+  { // keep track of files to delete (anything local that isn't in the recvlist)
+    file_list **p = &to_delete;
+    while (*p) {
+      if (file_list_find_path(recvlist, (*p)->name)) {
+        file_list *tmp = *p;
+        *p = (*p)->next; // move next back
+        free(tmp);
+      } else {
+        p = &(*p)->next; // move p forward
+      }
+    }
+  }
+
   { // filter the recv list to exclude anything that we already have
     file_list **p = &recvlist;
     const file_list *iter = files;
@@ -168,7 +202,7 @@ bool download(int sockfd, const file_list *files, const char *destdir) {
   // send download response
   if (!respond_download(sockfd, recvlist)) {
     error("error sending download response");
-    return false;
+    goto cleanup;
   }
   file_list_free(recvlist);
   recvlist = NULL;
@@ -177,9 +211,29 @@ bool download(int sockfd, const file_list *files, const char *destdir) {
   while (!read_download_message(sockfd, &msg, &recvlist, destdir)) {
     if (errno != EINTR) { // EINTR is okay
       perror("read_download_message");
-      return false;
+      goto cleanup;
     }
   }
   file_list_free(recvlist);
+
+  { // delete files that we don't need anymore
+    char path[PATH_MAX] = {0};
+    for (file_list *iter = to_delete; iter; iter = iter->next) {
+      snprintf(path, sizeof(path), "%s/%s", destdir, iter->name);
+      printf("deleting %s\n", path);
+      unlink(path); // remove the file
+      {             // remove the parent director(ies) if empty
+        char *slash = strrchr(path, '/');
+        *slash = '\0'; // remove the file name
+        rmdir_p(path);
+      }
+    }
+  }
+  file_list_free(to_delete);
   return true;
+
+cleanup:
+  file_list_free(recvlist);
+  file_list_free(to_delete);
+  return false;
 }

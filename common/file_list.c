@@ -133,9 +133,17 @@ void file_list_insert(file_list **node, file_list *to_insert) {
 const file_list *file_list_find(const file_list *list, file_list *node) {
   while (list) {
     if (!memcmp(list->hash, node->hash, MD5_DIGEST_LENGTH) &&
-        !strcmp(list->name, node->name)) {
+        !strncmp(list->name, node->name, node->name_len)) {
       return list;
     }
+    list = list->next;
+  }
+  return NULL;
+}
+const file_list *file_list_find_path(const file_list *list, const char *path) {
+  while (list) {
+    if (!strncmp(list->name, path, list->name_len))
+      return list;
     list = list->next;
   }
   return NULL;

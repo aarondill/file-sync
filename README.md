@@ -1,7 +1,13 @@
 # File sync server
 
+A server/client that syncs a single directory between machines. Each server manages multiple clients and is responsible for propagating changes to all other clients.
+
+Each directory is a separate language implementation.
+
+## Usage
+
 Run `./server dir` to start the server.
 
-Run `./client server dir` to sync dir to server. You can pass `-u` to upload on startup.
+Run `./client server dir` to sync `dir` to server. You can pass `-u` to upload on startup.
 
 Send `SIGUSR1` to the client to run an upload.

@@ -30,8 +30,8 @@ if (NOT PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
 endif ()
 
 
-file(GLOB LIB_SOURCES src/lib/*.cpp)
-file(GLOB LIB_HEADERS src/lib/*.h)
+file(GLOB_RECURSE LIB_SOURCES src/lib/*.cpp)
+file(GLOB_RECURSE LIB_HEADERS src/lib/*.h)
 add_library(lib ${LIB_SOURCES} ${LIB_HEADERS})
 
 file(GLOB EXECS src/*.cpp)

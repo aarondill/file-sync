@@ -1,12 +1,14 @@
-#include "Socket.h"
+#include "FileDescriptor.h"
 #include <cstring>
 #include <stdexcept>
 #include <unistd.h>
 
-Socket::Socket(const int fd) : fd{fd} {}
-Socket::~Socket() { close(); }
+FileDescriptor::FileDescriptor(const int fd) : fd{fd} {}
+FileDescriptor::~FileDescriptor() {
+  close();
+}
 
-void Socket::write(const void *buffer, const size_t size) {
+void FileDescriptor::write(const void *buffer, const size_t size) {
   size_t rem = size;
   while (rem) {
     const ssize_t ret = ::write(fd, buffer, rem);
@@ -21,7 +23,7 @@ void Socket::write(const void *buffer, const size_t size) {
 
 // Attempts to read the full buffer, may return with less data if read returns
 // zero.
-size_t Socket::read(void *buffer, const size_t size) {
+size_t FileDescriptor::read(void *buffer, const size_t size) {
   size_t got = 0;
   while (got < size) {
     const ssize_t ret = ::read(fd, buffer, size - got);
@@ -36,14 +38,16 @@ size_t Socket::read(void *buffer, const size_t size) {
   return got;
 }
 
-void Socket::close() {
+void FileDescriptor::close() {
   if (::close(fd) < 0) throw std::runtime_error("Close failed");
   fd = -1;
 }
 
 // move assign/construct
-Socket::Socket(Socket &&in) noexcept { std::swap(fd, in.fd); }
-Socket &Socket::operator=(Socket &&in) noexcept {
+FileDescriptor::FileDescriptor(FileDescriptor &&in) noexcept {
+  std::swap(fd, in.fd);
+}
+FileDescriptor &FileDescriptor::operator=(FileDescriptor &&in) noexcept {
   std::swap(fd, in.fd);
   return *this;
 }

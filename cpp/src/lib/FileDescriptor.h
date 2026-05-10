@@ -2,15 +2,15 @@
 #include <cstddef>
 
 // A socket wrapper that closes the file descriptor in its destructor
-struct Socket {
-  explicit Socket(int fd);
-  ~Socket();
+struct FileDescriptor {
+  explicit FileDescriptor(int fd);
+  ~FileDescriptor();
   // no copy operators
-  Socket(Socket const &) = delete;
-  Socket &operator=(const Socket &) = delete;
+  FileDescriptor(FileDescriptor const &) = delete;
+  FileDescriptor &operator=(const FileDescriptor &) = delete;
   // move operators
-  Socket(Socket &&) noexcept;
-  Socket &operator=(Socket &&) noexcept;
+  FileDescriptor(FileDescriptor &&) noexcept;
+  FileDescriptor &operator=(FileDescriptor &&) noexcept;
 
   void write(const void *buffer, size_t size);
   // NOTE: May read less than size bytes if read() returns 0

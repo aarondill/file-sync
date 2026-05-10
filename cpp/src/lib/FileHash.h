@@ -6,6 +6,7 @@
 #include <md5.h>
 
 struct FileHash {
+  static_assert(sizeof(std::byte) == sizeof(uint8_t));
   std::byte hash[MD5_DIGEST_LENGTH];
   static std::expected<protocol::CBuffer, protocol::serror> deserialize(FileHash &out,
                                                                         protocol::CBuffer buf);

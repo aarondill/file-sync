@@ -29,14 +29,17 @@ if (NOT PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
     file(GENERATE OUTPUT ${PROJECT_BINARY_DIR}/.gitignore CONTENT "*")
 endif ()
 
-add_executable(main)
 
-if (MSVC)
-    message(SEND_ERROR "This project doesn't officially support MSVC. Your milage may vary. Pull requests are welcome.")
-endif ()
+file(GLOB LIB_SOURCES src/lib/*.cpp)
+file(GLOB LIB_HEADERS src/lib/*.h)
+add_library(lib ${LIB_SOURCES} ${LIB_HEADERS})
 
-if (NOT MSVC)
-    target_compile_options(main PRIVATE
+file(GLOB EXECS src/*.cpp)
+foreach (src ${EXECS})
+    # Cut off the file extension and directory path
+    get_filename_component(name ${src} NAME_WE)
+    add_executable(${name} ${src})
+    target_compile_options(${name} PRIVATE
             -Wall -Wextra -Wpedantic -Wno-changes-meaning
             $<$<CONFIG:Debug>:-Werror -Wno-unused>
     )
@@ -45,12 +48,9 @@ if (NOT MSVC)
         message(STATUS "Enabling address sanitizer and undefined behavior sanitizer.")
         # -fsanitize=undefined enabling the detection of undefined behavior such as integer overflows,
         # -fsanitize=address enabling the detection of memory problems such as buffer overflows and memory leaks
-        target_compile_options(main PRIVATE -fsanitize=undefined,address)
-        target_link_options(main PRIVATE -fsanitize=undefined,address)
+        target_compile_options(${name} PRIVATE -fsanitize=undefined,address)
+        target_link_options(${name} PRIVATE -fsanitize=undefined,address)
     endif ()
-endif ()
+    target_link_libraries(${name} lib)
+endforeach (src ${EXECS})
 
-
-file(GLOB SOURCES CONFIGURE_DEPENDS src/*.cpp)
-file(GLOB HEADERS CONFIGURE_DEPENDS src/*.h)
-target_sources(main PRIVATE ${SOURCES} ${HEADERS})

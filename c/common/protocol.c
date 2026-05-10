@@ -212,7 +212,7 @@ size_t deserialize_error(error_m *out, const uint8_t *buf, size_t len,
   buf += min_len;
 
   CHECK_LEN(len, min_len + out->message_len);
-  memcpy(out->message, buf + 3, out->message_len);
+  memcpy(out->message, buf, out->message_len);
   return min_len + out->message_len;
 }
 size_t serialize_error(uint8_t *buf, size_t len, const error_m *in,

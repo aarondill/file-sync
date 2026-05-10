@@ -1,7 +1,7 @@
 CFLAGS := -std=c11 -g -Wall -Wextra -pedantic -D_POSIX_C_SOURCE=200809L
 # Auto-dependency generation
 CFLAGS += -MMD -MP
-LDLIBS := -lpthread -lm -lcrypto -lssl
+LDLIBS := -lpthread -lm -lcrypto -lmd
 
 EXECS := $(patsubst %.c,%,$(wildcard *.c))
 C_OBJS := $(patsubst %.c,%.o,$(wildcard common/*.c))

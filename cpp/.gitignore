@@ -1,0 +1,3 @@
+compile_commands.json
+.cache
+# NOTE: build ignores itself using .gitignore

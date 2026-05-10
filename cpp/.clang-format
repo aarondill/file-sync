@@ -1,0 +1,13 @@
+BasedOnStyle: LLVM
+
+AllowShortFunctionsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+IndentCaseLabels: false
+SortIncludes: true
+ColumnLimit: 80
+IndentWidth: 2
+TabWidth: 8
+UseCRLF: false

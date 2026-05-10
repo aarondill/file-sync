@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(file-sync CXX)
 
+set(ignoreMe "${CMAKE_C_COMPILER}")
+
 if (NOT CMAKE_BUILD_TYPE)
     message(WARNING "No build type selected, default to Release")
     set(CMAKE_BUILD_TYPE Release)

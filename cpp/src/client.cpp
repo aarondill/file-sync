@@ -131,6 +131,7 @@ int main(const int argc, char **argv) {
       if (p_fds[CONN_IND].revents & POLLIN)
         throw std::runtime_error("upload pending while connection has data!");
 
+      update_list(directory); // files may change between downloads
       upload(connection, global_list, directory);
     }
   }

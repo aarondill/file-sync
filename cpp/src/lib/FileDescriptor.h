@@ -5,7 +5,9 @@
 
 // A socket wrapper that closes the file descriptor in its destructor
 struct FileDescriptor {
-  explicit FileDescriptor(int fd);
+  explicit FileDescriptor() = default;
+  // ReSharper disable once CppNonExplicitConvertingConstructor
+  FileDescriptor(int fd);
   ~FileDescriptor();
   // no copy operators
   FileDescriptor(FileDescriptor const &) = delete;
@@ -13,6 +15,7 @@ struct FileDescriptor {
   // move operators
   FileDescriptor(FileDescriptor &&) noexcept;
   FileDescriptor &operator=(FileDescriptor &&) noexcept;
+  bool operator==(const FileDescriptor &) const = default;
 
   void write(std::span<const std::byte> buffer);
   // reads bytes from is to the fd
@@ -22,6 +25,7 @@ struct FileDescriptor {
   // writes bytes from fd to os
   void read_to(std::ostream &os, size_t bytes);
   void close();
+  explicit operator int() const { return fd; }
 
 private:
   int fd = -1;

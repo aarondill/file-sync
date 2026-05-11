@@ -31,25 +31,31 @@ struct client_connect_m {
    * - 8 bits for protocol version
    *   - The server must reject any connection with a different version.
    */
-  uint8_t version;
+  uint8_t version = CLIENT_VERSION;
   /* 8 bits of flags, see client_connect_flags */
-  uint8_t flags;
+  uint8_t flags{};
   /* 8 bits for client name length in bytes */
-  uint8_t name_len;
+  uint8_t name_len{};
   /* human-readable client name (max of 255 bytes, variable length) */
-  char name[255];
+  char name[255]{};
+  client_connect_m() = default;
+  client_connect_m(const uint8_t flags, std::string_view name)
+      : flags{flags}, name_len{static_cast<uint8_t>(name.length())} {
+    assert(name.length() < UINT8_MAX);
+    std::ranges::copy(name, this->name);
+  }
   static std::expected<CBuffer, serror> deserialize(client_connect_m &out, CBuffer buf);
   static std::expected<Buffer, serror> serialize(Buffer buf, const client_connect_m &in);
 };
 static_assert(Serializable<client_connect_m> && Deserializable<client_connect_m>);
 
 // -- Client Connect Message --
-enum class client_connect_flags {
+enum client_connect_flags : uint8_t {
   INTENT_TO_UPLOAD = 1 << 0,
 };
 
 // -- Download Message --
-enum class flags : uint8_t {
+enum flags : uint8_t {
   /* Error */
   ERROR = 1 << 0,
 };
@@ -89,7 +95,7 @@ static_assert(Serializable<download_response_m> && Deserializable<download_respo
 
 // -- Error Message --
 /* Values for error_m.code */
-enum class error_code {
+enum error_code {
   TOO_MANY_CLIENTS = 1,
 };
 

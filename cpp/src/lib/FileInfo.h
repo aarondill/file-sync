@@ -2,6 +2,7 @@
 #include "FileHash.h"
 #include <vector>
 
+namespace fs = std::filesystem;
 struct FileInfo {
   explicit FileInfo(const std::string_view name, const FileHash hash, const size_t size)
       : path{name}, hash{hash}, size{size} {}
@@ -12,5 +13,5 @@ struct FileInfo {
   FileHash hash;
   size_t size;
   // Reads the directory and returns a list of all files in the directory
-  static std::vector<FileInfo> readList(const char *path);
+  static std::vector<FileInfo> readList(const fs::path &path);
 };

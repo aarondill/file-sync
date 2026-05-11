@@ -49,7 +49,7 @@ void write_download_message(FileDescriptor &fd, const std::span<const FileInfo> 
 }
 
 // Sends an upload message to the server
-void upload(FileDescriptor sockfd, const std::span<const FileInfo> files, const fs::path &srcdir) {
+void upload(FileDescriptor &sockfd, const std::span<const FileInfo> files, const fs::path &srcdir) {
   // send download message 1
   write_download_message(sockfd, files, nullptr);
 

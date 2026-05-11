@@ -18,9 +18,9 @@ void write_file_list(FileDescriptor &fd, std::span<const FileInfo> list, const f
     };
     std::ranges::copy(name, f.name);
 
-    auto msg = serialize(buf, f);
-    if (!msg) throw std::runtime_error("error serializing download file\n");
-    write_message(fd, msg.value());
+    auto end = serialize(buf, f);
+    if (!end) throw std::runtime_error("error serializing download file\n");
+    write_message(fd, {buf, std::distance(buf, end.data())});
   }
 
   if (!srcdir) return;
@@ -42,9 +42,9 @@ void write_download_message(FileDescriptor &fd, const std::span<const FileInfo> 
       .file_count = static_cast<uint8_t>(file_count),
   };
   std::byte buf[4096];
-  const auto b = serialize(buf, msg);
-  if (!b) throw std::runtime_error("error serializing download message\n");
-  write_message(fd, b.value());
+  const auto end = serialize(buf, msg);
+  if (!end) throw std::runtime_error("error serializing download message\n");
+  write_message(fd, {buf, std::distance(buf, end.data())});
   write_file_list(fd, list, srcdir);
 }
 

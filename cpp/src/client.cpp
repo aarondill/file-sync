@@ -102,9 +102,9 @@ int main(const int argc, char **argv) {
   FileDescriptor connection{init_connection(server)};
   { // send connect message
     const protocol::client_connect_m msg = init_connect_msg(should_upload);
-    const auto b = serialize(buf, msg);
-    if (!b) throw std::runtime_error("error serializing client connect message\n");
-    write_message(connection, b.value());
+    const auto end = serialize(buf, msg);
+    if (!end) throw std::runtime_error("error serializing client connect message\n");
+    write_message(connection, {buf, std::distance(buf, end.data())});
   }
 
   // The server starts by sending an upload to the client unless the client

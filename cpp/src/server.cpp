@@ -9,6 +9,7 @@
 #include <csignal>
 #include <cstring>
 #include <iostream>
+#include <list>
 #include <mutex>
 #include <netinet/in.h>
 #include <poll.h>
@@ -39,7 +40,12 @@ struct client_info {
 // each thread receives a pointer to its client_list
 std::shared_mutex client_mutex; // TODO:
 // you *must* lock any time you access this
-std::vector<client_info> clients;
+/*
+ * Use a list instead of a vector to avoid invalidating references
+ * With a vector, each add/remove invalidates any references since it may move the memory
+ * A list is a linked list and only operations on the element invalidate its reference
+ */
+std::list<client_info> clients;
 client_info &add_client(FileDescriptor conn) {
   client_info c{std::move(conn)}; // construct, then lock and move. construct has a syscall.
   std::unique_lock l{client_mutex};
@@ -56,7 +62,9 @@ void write_other_clients(const client_info &cur) {
   std::shared_lock l{client_mutex};
   constexpr std::byte buf[1]{};
   for (client_info &info : clients)
-    if (info != cur) info.pipe.write.write(buf);
+    try {
+      if (info != cur) info.pipe.write.write(buf);
+    } catch (std::exception &) {} // don't let bad threads kill this one
 }
 
 std::shared_mutex file_mutex; // TODO:
@@ -171,10 +179,11 @@ int main(const int argc, char **argv) {
 
   auto client_wrapper = [](client_info &i) {
     try {
-      return client_thread(i);
+      client_thread(i);
     } catch (const std::exception &e) {
       std::cerr << "Thread exited with exception: " << e.what() << std::endl;
     }
+    remove_client(i);
   };
 
   while (!stop.test()) {

@@ -117,14 +117,16 @@ int main(const int argc, char **argv) {
   p_fds[CONN_IND] = {.fd = static_cast<int>(connection), .events = POLL_IN, .revents{}};
 
   while (!stop.test()) {
-    p_fds[CONN_IND].revents = 0;
-    const int ret = poll(p_fds, std::size(p_fds), -1);
-    assert(ret != 0); // no timeout, so this should be true
-    // poll can still be interrupted by EINTR
-    if (ret < 0 && errno != EINTR) throw std::runtime_error(std::strerror(errno));
-    if (p_fds[CONN_IND].revents & POLLIN) {
-      download(connection, global_list, directory);
-      update_list(directory);
+    if (!upload_pending.test()) {
+      p_fds[CONN_IND].revents = 0;
+      const int ret = poll(p_fds, std::size(p_fds), -1);
+      assert(ret != 0); // no timeout, so this should be true
+      // poll can still be interrupted by EINTR
+      if (ret < 0 && errno != EINTR) throw std::runtime_error(std::strerror(errno));
+      if (p_fds[CONN_IND].revents & POLLIN) {
+        download(connection, global_list, directory);
+        update_list(directory);
+      }
     }
 
     if (upload_pending.test()) {
@@ -133,6 +135,7 @@ int main(const int argc, char **argv) {
 
       update_list(directory); // files may change between downloads
       upload(connection, global_list, directory);
+      upload_pending.clear();
     }
   }
 }

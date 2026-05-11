@@ -93,7 +93,7 @@ int main(const int argc, char **argv) {
   struct sigaction sa = {};
   sa.sa_handler = signal_handler;
   sa.sa_flags = SA_RESTART; // don't fail read() or write()
-  for (const int s : {SIGUSR1, SIGTERM, SIGINT, SIGQUIT})
+  for (const int s : {SIGUSR1, SIGTERM, SIGINT, SIGQUIT, SIGPIPE})
     sigaction(s, &sa, nullptr);
 
   update_list(directory); // update the list before starting the server

@@ -29,8 +29,7 @@ std::vector<FileInfo> read_file_list(FileDescriptor &fd, size_t file_count,
     // recv/write the file contents
     for (const FileInfo &iter : list) {
       const fs::path path = *destdir / iter.path; // resolve path according to destdir
-      if (!fs::create_directories(path.parent_path()))
-        throw std::runtime_error("error creating directory");
+      fs::create_directories(path.parent_path());
       std::ofstream ofs{path, std::ios::binary};
       if (!ofs) throw std::runtime_error("error opening file for writing\n");
       std::cout << "receiving " << path << ": " << iter.hash << std::endl;

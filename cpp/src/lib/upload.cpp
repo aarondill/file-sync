@@ -20,7 +20,8 @@ void write_file_list(FileDescriptor &fd, std::span<const FileInfo> list, const f
 
     auto end = serialize(buf, f);
     if (!end) throw std::runtime_error("error serializing download file\n");
-    write_message(fd, {buf, std::distance(buf, end.data())});
+    size_t len = std::distance(buf, end->data());
+    write_message(fd, {buf, len});
   }
 
   if (!srcdir) return;
@@ -44,7 +45,8 @@ void write_download_message(FileDescriptor &fd, const std::span<const FileInfo> 
   std::byte buf[4096];
   const auto end = serialize(buf, msg);
   if (!end) throw std::runtime_error("error serializing download message\n");
-  write_message(fd, {buf, std::distance(buf, end.data())});
+  size_t len = std::distance(buf, end->data());
+  write_message(fd, {buf, len});
   write_file_list(fd, list, srcdir);
 }
 
@@ -55,9 +57,9 @@ void upload(FileDescriptor &sockfd, const std::span<const FileInfo> files, const
 
   // receive download response
   std::byte buf[4096];
-  auto n = read_message(sockfd, buf);
+  const auto msg = read_message(sockfd, buf);
   protocol::download_response_m resp;
-  if (!deserialize(resp, buf)) throw std::runtime_error("error deserializing download response");
+  if (!deserialize(resp, msg)) throw std::runtime_error("error deserializing download response");
 
   std::vector<FileInfo> filtered_list;
   filtered_list.reserve(resp.file_count);

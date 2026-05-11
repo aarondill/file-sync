@@ -104,7 +104,8 @@ int main(const int argc, char **argv) {
     const protocol::client_connect_m msg = init_connect_msg(should_upload);
     const auto end = serialize(buf, msg);
     if (!end) throw std::runtime_error("error serializing client connect message\n");
-    write_message(connection, {buf, std::distance(buf, end.data())});
+    size_t len = std::distance(buf, end->data());
+    write_message(connection, {buf, len});
   }
 
   // The server starts by sending an upload to the client unless the client

@@ -51,6 +51,6 @@ foreach (src ${EXECS})
         target_compile_options(${name} PRIVATE -fsanitize=undefined,address)
         target_link_options(${name} PRIVATE -fsanitize=undefined,address)
     endif ()
-    target_link_libraries(${name} lib)
+    target_link_libraries(${name} lib md)
 endforeach (src ${EXECS})
 

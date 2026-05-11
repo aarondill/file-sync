@@ -9,14 +9,15 @@
 #include <csignal>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <netinet/in.h>
 #include <poll.h>
 #include <shared_mutex>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <unistd.h>
 #include <unordered_set>
-#define BUFSIZE 4096
 
 struct client_info {
   FileDescriptor conn;
@@ -29,55 +30,55 @@ struct client_info {
   explicit client_info(FileDescriptor fd) : conn{std::move(fd)} {
     int pipes[2];
     if (::pipe(pipes) == -1) throw std::runtime_error("pipe failed");
-    pipe = {pipes[0], pipes[1]};
+    pipe.read = FileDescriptor{pipes[0]};
+    pipe.write = FileDescriptor{pipes[1]};
   }
   bool operator==(const client_info &) const = default;
 };
 
 // each thread receives a pointer to its client_list
-std::shared_mutex TODO_clients; // TODO:
+std::shared_mutex client_mutex; // TODO:
 // you *must* lock any time you access this
 std::vector<client_info> clients;
-client_info &add_client(FileDescriptor connfd) {
-  // lock write client list
-  // pthread_rwlock_wrlock(&rwlock_clients);
-  return clients.emplace_back(std::move(connfd));
+client_info &add_client(FileDescriptor conn) {
+  client_info c{std::move(conn)}; // construct, then lock and move. construct has a syscall.
+  std::unique_lock l{client_mutex};
+  return clients.emplace_back(std::move(c));
 }
 void remove_client(const client_info &client) {
-  // lock write client list
-  // pthread_rwlock_wrlock(&rwlock_clients);
+  std::unique_lock l{client_mutex};
   const auto i = std::ranges::find(clients, client);
   if (i == clients.end()) throw std::logic_error("remove client that's not in the list");
   clients.erase(i);
 }
 // writes a single byte to all clients except the one specified
 void write_other_clients(const client_info &cur) {
-  // pthread_rwlock_rdlock(&rwlock_clients);
+  std::shared_lock l{client_mutex};
   constexpr std::byte buf[1]{};
   for (client_info &info : clients)
     if (info != cur) info.pipe.write.write(buf);
 }
 
-std::shared_mutex TODO_files; // TODO:
+std::shared_mutex file_mutex; // TODO:
 std::vector<FileInfo> global_list;
 void update_list(const fs::path &directory) {
-  // pthread_rwlock_wrlock(&rwlock_files);
-  global_list = FileInfo::readList(directory);
+  auto list = FileInfo::readList(directory);
+  std::unique_lock l{file_mutex};
+  global_list = std::move(list);
 }
 
-volatile bool stop = false;
+std::atomic_flag stop = false;
 void signal_handler(const int signum) {
-  if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) { stop = true; }
+  if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) { stop.test_and_set(); }
   // SIGUSR1 in client
 }
 
 // this may not change after startup
 fs::path directory;
 
-void client_thread(void *arg) {
-  auto &client = *static_cast<client_info *>(arg);
+void client_thread(client_info &client) {
   protocol::client_connect_m msg;
-  std::byte buf[BUFSIZE];
+  std::byte buf[4096];
   { // read the client connect message
     const auto b = read_message(client.conn, buf);
     if (!deserialize(msg, b))
@@ -92,28 +93,30 @@ void client_thread(void *arg) {
     client.pipe.write.write(b); // write to initiate an upload
   }
 
-  const int CONNIND = 0, PIPEIND = 1;
-  pollfd pfds[2] = {
-      {.fd = static_cast<int>(client.conn), .events = POLL_IN, .revents{}},
-      {.fd = static_cast<int>(client.pipe.read), .events = POLL_IN, .revents{}},
-  };
+  constexpr int CONN_IND = 0, PIPE_IND = 1;
+  pollfd p_fds[2];
+  p_fds[CONN_IND] = {.fd = static_cast<int>(client.conn), .events = POLL_IN, .revents{}};
+  p_fds[PIPE_IND] = {.fd = static_cast<int>(client.pipe.read), .events = POLL_IN, .revents{}};
 
-  while (!stop) {
-    int ret = poll(pfds, 2, -1);
+  while (!stop.test()) {
+    const int ret = poll(p_fds, 2, -1);
     assert(ret != 0); // no timeout, so this should be true
     if (ret < 0) throw std::runtime_error(std::strerror(errno));
-    if (pfds[PIPEIND].revents & POLLIN) { // pipe has data, should upload
-      if (pfds[CONNIND].revents & POLLIN) throw std::runtime_error("both pipe and conn have data!");
+    if (p_fds[PIPE_IND].revents & POLLIN) { // pipe has data, should upload
+      if (p_fds[CONN_IND].revents & POLLIN)
+        throw std::runtime_error("both pipe and conn have data!");
 
-      // pthread_rwlock_rdlock(&rwlock_files);
-      upload(client.conn, global_list, directory);
-      // pthread_rwlock_unlock(&rwlock_files);
+      {
+        std::shared_lock l{file_mutex};
+        upload(client.conn, global_list, directory);
+      }
       std::byte b[1]; // empty the pipe
       client.pipe.read.read(b);
-    } else if (pfds[CONNIND].revents & POLLIN) { // conn has data, should download
-                                                 // pthread_rwlock_rdlock(&rwlock_files);
-      download(client.conn, global_list, directory);
-      // pthread_rwlock_unlock(&rwlock_files);
+    } else if (p_fds[CONN_IND].revents & POLLIN) { // conn has data, should download
+      {
+        std::shared_lock l{file_mutex};
+        download(client.conn, global_list, directory);
+      }
       update_list(directory);
       write_other_clients(client);
     } else
@@ -137,12 +140,12 @@ int main(const int argc, char **argv) {
     throw std::runtime_error("directory is not readable or writable\n");
   }
 
-  int socket_ret = socket(AF_INET, SOCK_STREAM, 0);
+  const int socket_ret = socket(AF_INET, SOCK_STREAM, 0);
   if (socket_ret < 0) throw std::runtime_error(std::strerror(errno));
-  FileDescriptor listenfd{socket_ret};
+  const FileDescriptor fd{socket_ret};
   { // set SO_REUSEADDR to make debugging easier
     constexpr int val = 1;
-    setsockopt(static_cast<int>(listenfd), SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+    setsockopt(static_cast<int>(fd), SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
   }
 
   sockaddr_in serv_addr = {
@@ -152,12 +155,11 @@ int main(const int argc, char **argv) {
       .sin_zero{} //
   };
 
-  if (bind(static_cast<int>(listenfd), reinterpret_cast<sockaddr *>(&serv_addr),
-           sizeof(serv_addr)) < 0)
+  if (bind(static_cast<int>(fd), reinterpret_cast<sockaddr *>(&serv_addr), sizeof(serv_addr)) < 0)
     throw std::runtime_error(std::strerror(errno));
   std::cout << "Connect to the server at port " << port << std::endl;
 
-  if (listen(static_cast<int>(listenfd), 10) < 0) throw std::runtime_error(std::strerror(errno));
+  if (listen(static_cast<int>(fd), 10) < 0) throw std::runtime_error(std::strerror(errno));
 
   struct sigaction sa = {};
   sa.sa_handler = signal_handler;
@@ -166,21 +168,21 @@ int main(const int argc, char **argv) {
     sigaction(s, &sa, nullptr);
 
   update_list(directory); // update the list before starting the server
-  // pthread_attr_t attr;
-  // pthread_attr_init(&attr);
-  // pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-  while (!stop) {
-    int connfd = accept(static_cast<int>(listenfd), nullptr, nullptr);
-    if (connfd < 0) throw std::runtime_error(std::strerror(errno));
-    client_info &client = add_client(connfd);
-    client_thread(&client);
-    // pthread_t tid;
-    // if (pthread_create(&tid, NULL, client_thread, (void *)&client->info)) {
-    //   perror("pthread_create");
-    //   return 1;
-    // }
+  auto client_wrapper = [](client_info &i) {
+    try {
+      return client_thread(i);
+    } catch (const std::exception &e) {
+      std::cerr << "Thread exited with exception: " << e.what() << std::endl;
+    }
+  };
+
+  while (!stop.test()) {
+    const int conn = accept(static_cast<int>(fd), nullptr, nullptr);
+    if (conn < 0) throw std::runtime_error(std::strerror(errno));
+    client_info &client = add_client(FileDescriptor{conn});
+    std::jthread t{client_wrapper, std::ref(client)};
+    t.detach();
   }
   std::cout << "Closing server" << std::endl;
-  // pthread_exit(NULL); // allow other threads to exit cleanly
 }

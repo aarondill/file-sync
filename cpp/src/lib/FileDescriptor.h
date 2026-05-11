@@ -6,8 +6,7 @@
 // A socket wrapper that closes the file descriptor in its destructor
 struct FileDescriptor {
   explicit FileDescriptor() = default;
-  // ReSharper disable once CppNonExplicitConvertingConstructor
-  FileDescriptor(int fd);
+  explicit FileDescriptor(int fd);
   ~FileDescriptor();
   // no copy operators
   FileDescriptor(FileDescriptor const &) = delete;

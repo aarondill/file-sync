@@ -4,16 +4,18 @@
 #include "lib/upload.h"
 #include "lib/util.h"
 #include <arpa/inet.h>
+#include <atomic>
 #include <cassert>
-#include <cerrno>
 #include <csignal>
-#include <cstddef>
 #include <cstring>
 #include <iostream>
-#include <netdb.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <string_view>
 #include <sys/socket.h>
 #include <sys/types.h>
-#define BUFSIZE 4096
+#include <unistd.h>
+#include <unordered_set>
 
 // returns a socket file descriptor
 // if it fails, exits
@@ -41,7 +43,6 @@ FileDescriptor init_connection(std::string_view server) {
 
   return sockfd;
 }
-
 // Initialize a client connect message
 // If name is NULL, the name will be set to the hostname returned by gethostname
 protocol::client_connect_m init_connect_msg(const bool upload) {
@@ -53,21 +54,16 @@ protocol::client_connect_m init_connect_msg(const bool upload) {
   return {flags, name};
 }
 
-volatile bool upload_pending = false;
-volatile bool stop = false;
-
-// No locking is required here, since the client is single-threaded
 std::vector<FileInfo> global_list;
-void update_list(const char *directory) {
+void update_list(const fs::path &directory) {
   global_list = FileInfo::readList(directory);
 }
 
-extern "C" void signal_handler(const int signum) {
-  if (signum == SIGUSR1) {
-    upload_pending = true;
-  } else if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) {
-    stop = true;
-  }
+std::atomic_flag stop = false;
+std::atomic_flag upload_pending = false;
+void signal_handler(const int signum) {
+  if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) { stop.test_and_set(); }
+  if (signum == SIGUSR1) upload_pending.test_and_set();
 }
 
 int main(const int argc, char **argv) {
@@ -85,9 +81,8 @@ int main(const int argc, char **argv) {
     std::cerr << "usage: " << argv[0] << " <server ip> <directory> [-u]" << std::endl;
     return 2;
   }
-  char *server = argv[optind]; // name:port; name may be host or IP
-  char *directory = argv[optind + 1];
-
+  const char *server = argv[optind]; // name:port; name may be host or IP
+  const fs::path directory = argv[optind + 1];
   if (const auto s = fs::status(directory); //
       s.type() != fs::file_type::directory ||
       fs::perms::none == (s.permissions() & fs::perms::owner_read) ||
@@ -95,37 +90,55 @@ int main(const int argc, char **argv) {
     throw std::runtime_error("directory is not readable or writable\n");
   }
 
-  std::byte buf[BUFSIZE];
-
-  FileDescriptor sockfd = init_connection(server);
-  { // send connect message
-    const protocol::client_connect_m msg = init_connect_msg(should_upload);
-    const auto b = serialize(buf, msg);
-    if (!b) throw std::runtime_error("error serializing client connect message\n");
-    write_message(sockfd, b.value());
-  }
-
-  update_list(directory);
-
-  if (should_upload) upload_pending = true;
-
   struct sigaction sa = {};
   sa.sa_handler = signal_handler;
   sa.sa_flags = SA_RESTART; // don't fail read() or write()
   for (const int s : {SIGUSR1, SIGTERM, SIGINT, SIGQUIT})
     sigaction(s, &sa, nullptr);
 
-  while (!stop) {
-    // TODO: poll() on sockfd and a pipe instead of `upload_pending`
-    if (!upload_pending) {
-      download(sockfd, global_list, directory);
-      // update the list on a successful download
+  update_list(directory); // update the list before starting the server
+
+  std::byte buf[4096];
+  FileDescriptor connection{init_connection(server)};
+  { // send connect message
+    const protocol::client_connect_m msg = init_connect_msg(should_upload);
+    const auto b = serialize(buf, msg);
+    if (!b) throw std::runtime_error("error serializing client connect message\n");
+    write_message(connection, b.value());
+  }
+
+  protocol::client_connect_m msg;
+  { // read the client connect message
+    const auto b = read_message(connection, buf);
+    if (!deserialize(msg, b))
+      throw std::runtime_error("error deserializing client connect message");
+    std::cout << "Client connected: " << std::string_view{msg.name, msg.name_len} << std::endl;
+  }
+
+  // The server starts by sending an upload to the client unless the client
+  // explicitly requests otherwise
+  if (!(msg.flags & protocol::INTENT_TO_UPLOAD)) upload_pending.test_and_set();
+
+  constexpr int CONN_IND = 0;
+  pollfd p_fds[1];
+  p_fds[CONN_IND] = {.fd = static_cast<int>(connection), .events = POLL_IN, .revents{}};
+
+  while (!stop.test()) {
+    p_fds[CONN_IND].revents = 0;
+    const int ret = poll(p_fds, std::size(p_fds), -1);
+    assert(ret != 0); // no timeout, so this should be true
+    // poll can still be interrupted by EINTR
+    if (ret < 0 && errno != EINTR) throw std::runtime_error(std::strerror(errno));
+    if (p_fds[CONN_IND].revents & POLLIN) {
+      download(connection, global_list, directory);
       update_list(directory);
     }
-    // note: this value can change during `download`
-    if (upload_pending) {
-      upload(sockfd, global_list, directory);
-      upload_pending = false;
+
+    if (upload_pending.test()) {
+      if (p_fds[CONN_IND].revents & POLLIN)
+        throw std::runtime_error("upload pending while connection has data!");
+
+      upload(connection, global_list, directory);
     }
   }
 }

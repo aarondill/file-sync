@@ -51,7 +51,9 @@ void FileDescriptor::read_to(std::ostream &os, size_t bytes) {
   char buffer[4096];
   while (bytes) {
     if (!os) throw std::runtime_error("could not write to output stream");
-    auto got = read(as_writable_bytes(std::span{buffer}));
+    size_t to_read = std::min(bytes, std::size(buffer));
+    auto got = read(as_writable_bytes(std::span{buffer, to_read}));
+    if (got.empty()) throw std::runtime_error("not enough data in file descriptor");
 
     os.write(buffer, static_cast<std::streamsize>(got.size()));
     if (os.bad()) throw std::runtime_error("could not write to output stream");

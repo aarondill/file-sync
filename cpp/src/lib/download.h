@@ -3,4 +3,4 @@
 #include "FileInfo.h"
 #include <filesystem>
 namespace fs = std::filesystem;
-bool download(FileDescriptor sockfd, const std::vector<FileInfo> &files, fs::path destdir);
+void download(FileDescriptor &sockfd, std::span<FileInfo> files, const fs::path &destdir);

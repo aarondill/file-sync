@@ -3,4 +3,4 @@
 #include "FileInfo.h"
 #include <filesystem>
 namespace fs = std::filesystem;
-bool upload(FileDescriptor sockfd, const std::vector<FileInfo> &files, fs::path srcdir);
+void upload(FileDescriptor sockfd, const std::span<const FileInfo> files, const fs::path &srcdir);

@@ -13,10 +13,10 @@ namespace protocol {
 struct download_file_m {
   /* 128 bits for file hash (MD5) */
   FileHash hash;
-  /* 8 bits for file name length in bytes */
-  uint8_t name_len{};
   /* 32 bits for file size in bytes */
   uint32_t size{};
+  /* 8 bits for file name length in bytes */
+  uint8_t name_len{};
   /* File name (max of 255 bytes, variable length) */
   char name[255]{};
   static std::expected<CBuffer, serror> deserialize(download_file_m &out, CBuffer buf);
@@ -68,13 +68,14 @@ static_assert(Serializable<download_m> && Deserializable<download_m>);
 // -- Download Response Message --
 struct download_response_m {
   /* 8 bits for flags */
-  uint8_t flags;
+  uint8_t flags{};
   /* 8 bits for file count */
-  uint8_t file_count;
+  uint8_t file_count{};
   /* 128 bits for file hash (MD5) */
-  FileHash files[255];
+  FileHash files[255]{};
   static std::expected<CBuffer, serror> deserialize(download_response_m &out, CBuffer buf);
   static std::expected<Buffer, serror> serialize(Buffer buf, const download_response_m &in);
+  download_response_m() = default;
   explicit download_response_m(const std::span<const FileInfo> files, const uint8_t flags)
       : flags{flags}, file_count{static_cast<uint8_t>(files.size())} {
     assert(files.size() < std::size(this->files));

@@ -1,5 +1,7 @@
 #pragma once
 #include <cstddef>
+#include <iosfwd>
+#include <span>
 
 // A socket wrapper that closes the file descriptor in its destructor
 struct FileDescriptor {
@@ -12,9 +14,13 @@ struct FileDescriptor {
   FileDescriptor(FileDescriptor &&) noexcept;
   FileDescriptor &operator=(FileDescriptor &&) noexcept;
 
-  void write(const void *buffer, size_t size);
+  void write(std::span<const std::byte> buffer);
+  // reads bytes from is to the fd
+  void write_from(std::istream &is, size_t bytes);
   // NOTE: May read less than size bytes if read() returns 0
-  size_t read(void *buffer, size_t size);
+  std::span<std::byte> read(std::span<std::byte> buffer);
+  // writes bytes from fd to os
+  void read_to(std::ostream &os, size_t bytes);
   void close();
 
 private:

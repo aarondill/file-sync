@@ -3,6 +3,8 @@
 #include <vector>
 
 struct FileInfo {
+  explicit FileInfo(const std::string_view name, const FileHash hash, const size_t size)
+      : path{name}, hash{hash}, size{size} {}
   explicit FileInfo(std::filesystem::path path)
       : path(std::move(path)), hash{this->path}, size{file_size(this->path)} {}
   /** A relative path, which may only be <=255 chars long! */

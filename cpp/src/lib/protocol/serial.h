@@ -43,14 +43,14 @@ concept Deserializable = requires(T x, CBuffer buf) {
 /* An overload to call the static deserialize method */
 template <typename T>
   requires Deserializable<T>
-std::expected<CBuffer, serror> deserialize(T out, CBuffer buf) {
+std::expected<CBuffer, serror> deserialize(T &out, CBuffer buf) {
   return T::deserialize(out, buf);
 }
 
 /* An overload to call the static serialize method */
 template <typename T>
   requires Serializable<T>
-std::expected<Buffer, serror> serialize(Buffer buf, T in) {
+std::expected<Buffer, serror> serialize(Buffer buf, const T &in) {
   return T::serialize(buf, in);
 }
 

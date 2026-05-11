@@ -1,7 +1,11 @@
 #pragma once
 #include "../FileHash.h"
+#include "../FileInfo.h"
 #include "serial.h"
+
+#include <assert.h>
 #include <expected>
+#include <ranges>
 #include <span>
 namespace protocol {
 
@@ -10,11 +14,11 @@ struct download_file_m {
   /* 128 bits for file hash (MD5) */
   FileHash hash;
   /* 8 bits for file name length in bytes */
-  uint8_t name_len;
+  uint8_t name_len{};
   /* 32 bits for file size in bytes */
-  uint32_t size;
+  uint32_t size{};
   /* File name (max of 255 bytes, variable length) */
-  char name[255];
+  char name[255]{};
   static std::expected<CBuffer, serror> deserialize(download_file_m &out, CBuffer buf);
   static std::expected<Buffer, serror> serialize(Buffer buf, const download_file_m &in);
 };
@@ -71,6 +75,14 @@ struct download_response_m {
   FileHash files[255];
   static std::expected<CBuffer, serror> deserialize(download_response_m &out, CBuffer buf);
   static std::expected<Buffer, serror> serialize(Buffer buf, const download_response_m &in);
+  explicit download_response_m(const std::span<const FileInfo> files, const uint8_t flags)
+      : flags{flags}, file_count{static_cast<uint8_t>(files.size())} {
+    assert(files.size() < std::size(this->files));
+    std::ranges::copy(files | std::views::transform([](const FileInfo &file) { return file.hash; }),
+                      this->files);
+  }
+  explicit download_response_m(const std::span<const FileInfo> files)
+      : download_response_m(files, 0) {}
 };
 static_assert(Serializable<download_response_m> && Deserializable<download_response_m>);
 

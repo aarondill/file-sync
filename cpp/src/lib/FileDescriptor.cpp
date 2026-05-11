@@ -6,6 +6,7 @@
 
 FileDescriptor::FileDescriptor(const int fd) : fd{fd} {}
 FileDescriptor::~FileDescriptor() {
+  if (fd == -1) return;
   close();
 }
 

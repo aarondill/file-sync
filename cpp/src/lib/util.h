@@ -18,6 +18,8 @@ inline std::span<std::byte> read_message(FileDescriptor &sockfd, const std::span
   std::byte length_buffer[sizeof(uint16_t)];
   const auto lb = sockfd.read(length_buffer);
 
+  if (lb.empty()) throw std::runtime_error("read() returned 0 bytes. Is the other side dead?");
+
   uint16_t len;
   if (!protocol::deserialize(len, lb))
     throw std::runtime_error("error deserializing message length\n");

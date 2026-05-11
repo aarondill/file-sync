@@ -6,8 +6,8 @@ namespace fs = std::filesystem;
 struct FileInfo {
   explicit FileInfo(const std::string_view name, const FileHash hash, const size_t size)
       : path{name}, hash{hash}, size{size} {}
-  explicit FileInfo(std::filesystem::path path)
-      : path(std::move(path)), hash{this->path}, size{file_size(this->path)} {}
+  explicit FileInfo(const fs::path &path, const fs::path &base)
+      : path{path.lexically_relative(base)}, hash{path}, size{file_size(path)} {}
   /** A relative path, which may only be <=255 chars long! */
   std::filesystem::path path;
   FileHash hash;

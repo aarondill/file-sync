@@ -107,17 +107,9 @@ int main(const int argc, char **argv) {
     write_message(connection, b.value());
   }
 
-  protocol::client_connect_m msg;
-  { // read the client connect message
-    const auto b = read_message(connection, buf);
-    if (!deserialize(msg, b))
-      throw std::runtime_error("error deserializing client connect message");
-    std::cout << "Client connected: " << std::string_view{msg.name, msg.name_len} << std::endl;
-  }
-
   // The server starts by sending an upload to the client unless the client
   // explicitly requests otherwise
-  if (!(msg.flags & protocol::INTENT_TO_UPLOAD)) upload_pending.test_and_set();
+  if (should_upload) upload_pending.test_and_set();
 
   constexpr int CONN_IND = 0;
   pollfd p_fds[1];

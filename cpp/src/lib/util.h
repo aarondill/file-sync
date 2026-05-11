@@ -16,10 +16,10 @@ inline void write_message(FileDescriptor &sockfd, const std::span<const std::byt
 }
 inline std::span<std::byte> read_message(FileDescriptor &sockfd, const std::span<std::byte> buf) {
   std::byte length_buffer[sizeof(uint16_t)];
-  sockfd.read(length_buffer);
+  const auto lb = sockfd.read(length_buffer);
 
   uint16_t len;
-  if (!protocol::deserialize(len, length_buffer))
+  if (!protocol::deserialize(len, lb))
     throw std::runtime_error("error deserializing message length\n");
 
   if (len > buf.size_bytes()) throw std::runtime_error("not enough space in buffer");

@@ -12,7 +12,7 @@ std::expected<Buffer, serror> FileHash::serialize(const Buffer buf, const FileHa
 FileHash::FileHash(std::filesystem::path const &path) {
   std::ifstream ifs{path};
   if (!ifs.is_open()) throw std::runtime_error{"Cannot open file"};
-  ifs.exceptions(std::ios_base::failbit); // throw if there's a read error
+  ifs.exceptions(std::ios_base::badbit); // throw if there's a read error
   MD5_CTX ctx;
   MD5Init(&ctx);
   uint8_t data[1024];

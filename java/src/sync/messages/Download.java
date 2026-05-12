@@ -9,7 +9,7 @@ import java.util.EnumSet;
 import java.util.stream.Stream;
 
 /** Followed by file_count download_file_m's */
-class Download implements Serialize {
+public class Download implements Serialize {
   static enum Flags implements Bitfield {
     ERROR; // =0
   };
@@ -17,6 +17,9 @@ class Download implements Serialize {
   public EnumSet<Flags> flags;
   public int file_count;
 
+  public Download(int file_count) {
+    this(EnumSet.noneOf(Flags.class), file_count);
+  }
   public Download(EnumSet<Flags> flags, int file_count) {
     this.flags = flags;
     this.file_count = file_count;
@@ -31,9 +34,14 @@ class Download implements Serialize {
     out.writeByte(file_count);
   }
   public Download(DataInputStream in) throws IOException {
+    in.mark(1); // we may need to reset the stream back one byte
     int flags = in.readUnsignedByte();
     this.flags = EnumSet.noneOf(Flags.class);
     Stream.of(Flags.values()).filter(flag -> (flags & flag.bitval()) != 0).forEach(this.flags::add);
+    if (this.flags.contains(Flags.ERROR)) {
+      in.reset();
+      throw new Error.IsError();
+    }
 
     file_count = in.readUnsignedByte();
   }

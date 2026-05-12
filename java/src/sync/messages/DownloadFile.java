@@ -4,22 +4,26 @@ import sync.Serialize;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import sync.FileHash;
+import sync.FileInfo;
 
 /** Followed by file_size bytes of file data */
 public class DownloadFile implements Serialize {
   /* 128 bits for file hash (MD5) */
-  FileHash hash;
+  public FileHash hash;
   /* 32 bits for file size in bytes */
-  long size;
+  public long size;
   /* 8 bits for file name length in bytes */
   /* File name (max of 255 bytes, variable length) */
-  String name;
+  public String name;
 
-  public DownloadFile(FileHash hash, long size, String name) {
-    this.hash = hash;
-    this.size = size;
-    this.name = name;
+  public DownloadFile(FileInfo file) {
+    this.hash = file.hash;
+    this.size = file.size;
+    if (file.size >= Math.pow(2, 32)) throw new IllegalArgumentException("File size too large");
+    this.name = file.name.toString();
+    if (name.length() >= Math.pow(2, 8)) throw new IllegalArgumentException("File name too long");
   }
   public DownloadFile(DataInputStream s) throws IOException {
     hash = new FileHash(s);
@@ -38,4 +42,10 @@ public class DownloadFile implements Serialize {
     s.writeByte(name.length());
     s.writeBytes(name);
   }
+
+  public FileInfo toFileInfo() throws IOException {
+    Path path = Path.of(name);
+    return new FileInfo(path, hash, size);
+  }
+
 }

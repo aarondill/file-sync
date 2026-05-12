@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 public class FileHash implements Serialize {
   public byte[] hash;
@@ -36,5 +37,11 @@ public class FileHash implements Serialize {
   public FileHash(DataInputStream in) throws IOException {
     hash = new byte[16];
     in.readFully(hash);
+  }
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    return Arrays.equals(hash, ((FileHash) o).hash);
   }
 }

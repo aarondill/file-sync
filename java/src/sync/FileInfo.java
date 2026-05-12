@@ -6,16 +6,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class FileInfo {
-  Path name; // a relative path, relative to the base directory
-  FileHash hash;
-  long size;
+  public Path name; // a relative path, relative to the base directory
+  public FileHash hash;
+  public long size;
 
-  FileInfo(Path name, FileHash hash, long size) {
+  public FileInfo(Path name, FileHash hash, long size) {
     this.name = name;
     this.hash = hash;
     this.size = size;
   }
-  FileInfo(Path path, Path base) throws IOException {
+  public FileInfo(Path path, Path base) throws IOException {
     this.name = base.relativize(path);
     this.size = Files.size(path);
     this.hash = new FileHash(path);
@@ -31,5 +31,13 @@ public class FileInfo {
         }
       }).toList();
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    FileInfo fileInfo = (FileInfo) o;
+    return name.equals(fileInfo.name) && hash.equals(fileInfo.hash) && size == fileInfo.size;
   }
 };

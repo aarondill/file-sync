@@ -5,7 +5,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import sync.Serialize;
 
-class Error implements Serialize {
+public class Error implements Serialize {
+  static class IsError extends RuntimeException { // TODO: make checked?
+    public IsError() {
+      super("Tried to parse message with error flag set. Try again with the Error constructor.");
+    }
+  }
   static enum Code {
     TOO_MANY_CLIENTS // =0
   }

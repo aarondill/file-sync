@@ -124,9 +124,6 @@ bool read_file_list(int fd, size_t file_count, file_list **list,
       if (!succ)
         fatal("error receiving file contents\n");
     }
-  } else {
-    for (file_list *iter = *list; iter; iter = iter->next)
-      assert(iter->size == 0);
   }
   return true;
 

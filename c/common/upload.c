@@ -21,8 +21,7 @@ bool write_file_list(int fd, const file_list *list, const char *srcdir) {
     for (const file_list *node = list; node; node = node->next) {
       download_file_m f = {
           .name_len = node->name_len,
-          // must be zero if not, since there's no body
-          .size = srcdir ? node->size : 0,
+          .size = node->size,
       };
       memcpy(f.hash, node->hash, MD5_DIGEST_LENGTH);
       memcpy(f.name, node->name, node->name_len);

@@ -66,9 +66,9 @@ Note that this may be responded with an error if there are too many clients.
     - Files with longer names should be rejected (don't truncate because it can cause security issues, and split characters in the middle)
   - 32 bits for file size in bytes
     - Note: supports up to 4 GB
-    - Must be zero on initial message → client responds with subset of files to download
   - File name (max of 255 bytes, variable length)
 - All files data (variable length)
+  - This data is only present on the second message. The first message says the file sizes and count, but does not include the data.
   - Each file is sent in order, and the client must verify the hash
   - total size is the sum of all file sizes
 

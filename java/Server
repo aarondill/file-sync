@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euC
+./build.sh
+out="$(dirname -- "$0")/build/"
+java -cp "$out" "$(basename -- "$0")" "$@"

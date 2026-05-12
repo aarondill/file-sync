@@ -12,8 +12,7 @@ void write_file_list(FileDescriptor &fd, std::span<const FileInfo> list, const f
     assert(node.size <= UINT32_MAX);
     protocol::download_file_m f = {
         .hash = node.hash,
-        // must be zero if not, since there's not a body
-        .size = static_cast<uint32_t>(srcdir ? node.size : 0),
+        .size = static_cast<uint32_t>(node.size),
         .name_len = static_cast<uint8_t>(name.length()),
     };
     std::ranges::copy(name, f.name);

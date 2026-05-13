@@ -33,7 +33,7 @@ enum client_connect_flags {
   INTENT_TO_UPLOAD = 1 << 0,
 };
 // Refuse to deserialize if the version is different
-static const uint8_t CLIENT_VERSION = 1;
+static const uint8_t CLIENT_VERSION = 2;
 
 typedef struct client_connect_m client_connect_m;
 struct client_connect_m {

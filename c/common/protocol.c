@@ -124,13 +124,13 @@ size_t deserialize_download_file(download_file_m *out, const uint8_t *buf,
   if (err2)
     RET_ERR(err2);
 
-  CHECK_REMAIN_LEN(len, sizeof(uint8_t));
-  out->name_len = buf[0];
-  buf += sizeof(uint8_t);
-
   buf += deserialize_uint32(&out->size, buf, len - (buf - obuf), &err2);
   if (err2)
     RET_ERR(err2);
+
+  CHECK_REMAIN_LEN(len, sizeof(uint8_t));
+  out->name_len = buf[0];
+  buf += sizeof(uint8_t);
 
   CHECK_REMAIN_LEN(len, out->name_len);
   memcpy(out->name, buf, out->name_len);
@@ -146,13 +146,13 @@ size_t serialize_download_file(uint8_t *buf, size_t len,
   if (err2)
     RET_ERR(err2);
 
-  CHECK_REMAIN_LEN(len, sizeof(uint8_t));
-  buf[0] = in->name_len;
-  buf += sizeof(uint8_t);
-
   buf += serialize_uint32(buf, len - (buf - obuf), in->size, &err2);
   if (err2)
     RET_ERR(err2);
+
+  CHECK_REMAIN_LEN(len, sizeof(uint8_t));
+  buf[0] = in->name_len;
+  buf += sizeof(uint8_t);
 
   CHECK_REMAIN_LEN(len, in->name_len);
   memcpy(buf, in->name, in->name_len);

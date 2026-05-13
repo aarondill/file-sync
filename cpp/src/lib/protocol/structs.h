@@ -26,7 +26,7 @@ static_assert(Serializable<download_file_m> && Deserializable<download_file_m>);
 
 struct client_connect_m {
   // Refuse to deserialize if the version is different
-  static constexpr uint8_t CLIENT_VERSION = 1;
+  static constexpr uint8_t CLIENT_VERSION = 2;
   /*
    * - 8 bits for protocol version
    *   - The server must reject any connection with a different version.

@@ -44,16 +44,16 @@ std::expected<CBuffer, serror> download_file_m::deserialize(download_file_m &out
                                                             const CBuffer buf) {
   using protocol::deserialize;
   return deserialize(out.hash, buf)
-      .and_then([&out](CBuffer &&b) { return deserialize(out.name_len, b); })
       .and_then([&out](CBuffer &&b) { return deserialize(out.size, b); })
+      .and_then([&out](CBuffer &&b) { return deserialize(out.name_len, b); })
       .and_then([&out](CBuffer &&b) { return deserialize(std::span{out.name, out.name_len}, b); });
 }
 std::expected<Buffer, serror> download_file_m::serialize(const Buffer buf,
                                                          const download_file_m &in) {
   using protocol::serialize;
   return serialize(buf, in.hash)
-      .and_then([&in](Buffer &&b) { return serialize(b, in.name_len); })
       .and_then([&in](Buffer &&b) { return serialize(b, in.size); })
+      .and_then([&in](Buffer &&b) { return serialize(b, in.name_len); })
       .and_then([&in](Buffer &&b) { return serialize(b, std::span{in.name, in.name_len}); });
 }
 

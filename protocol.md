@@ -24,6 +24,11 @@ To upload:
 
 Note that this means the server is effectively a client that additionally maintains a list of connections and initiates downloads post-receive.
 
+## Change log
+
+- Protocol version 2:
+  - Switch order of Download message's file's size and name length. The name length now comes after size and immediately before the name.
+
 ## Protocol
 
 All messages start with an uint16 length field, followed by the header length!
@@ -31,7 +36,7 @@ All messages start with an uint16 length field, followed by the header length!
 ### Client connect message
 
 - 8 bits for protocol version
-  - Must be 1
+  - Must be 2
   - The server must reject any connection with a different version. No backwards compatibility here.
 - 8 bits of flags
   - bit 0 - intent to upload
@@ -61,11 +66,11 @@ Note that this may be responded with an error if there are too many clients.
   - Note: supports up to 255 files
 - for each file:
   - 128 bits for file hash (MD5)
+  - 32 bits for file size in bytes
+    - Note: supports up to 4 GB
   - 8 bits for file name length in bytes
     - Note: supports up to 255 bytes
     - Files with longer names should be rejected (don't truncate because it can cause security issues, and split characters in the middle)
-  - 32 bits for file size in bytes
-    - Note: supports up to 4 GB
   - File name (max of 255 bytes, variable length)
 - All files data (variable length)
   - This data is only present on the second message. The first message says the file sizes and count, but does not include the data.

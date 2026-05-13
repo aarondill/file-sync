@@ -14,7 +14,7 @@ public class ClientConnect implements Serialize {
     INTENT_TO_UPLOAD; // =0
   }
 
-  static final int CLIENT_VERSION = 1;
+  static final int CLIENT_VERSION = 2;
   public int version = CLIENT_VERSION;
   public EnumSet<Flags> flags = EnumSet.noneOf(Flags.class);
   public String name;

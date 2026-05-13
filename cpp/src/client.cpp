@@ -6,8 +6,10 @@
 #include <arpa/inet.h>
 #include <atomic>
 #include <cassert>
+#include <cctype>
 #include <csignal>
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <netinet/in.h>
 #include <poll.h>
@@ -15,7 +17,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 // returns a socket file descriptor
 // if it fails, exits
@@ -63,7 +67,6 @@ std::atomic_flag stop = false;
 std::atomic_flag upload_pending = false;
 void signal_handler(const int signum) {
   if (signum == SIGTERM || signum == SIGINT || signum == SIGQUIT) { stop.test_and_set(); }
-  if (signum == SIGUSR1) upload_pending.test_and_set();
 }
 
 int main(const int argc, char **argv) {
@@ -93,7 +96,7 @@ int main(const int argc, char **argv) {
   struct sigaction sa = {};
   sa.sa_handler = signal_handler;
   sa.sa_flags = SA_RESTART; // don't fail read() or write()
-  for (const int s : {SIGUSR1, SIGTERM, SIGINT, SIGQUIT, SIGPIPE})
+  for (const int s : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE})
     sigaction(s, &sa, nullptr);
 
   update_list(directory); // update the list before starting the server
@@ -112,9 +115,23 @@ int main(const int argc, char **argv) {
   // explicitly requests otherwise
   if (should_upload) upload_pending.test_and_set();
 
-  constexpr int CONN_IND = 0;
-  pollfd p_fds[1];
+  constexpr int CONN_IND = 0, STDIN_IND = 1;
+  pollfd p_fds[2];
   p_fds[CONN_IND] = {.fd = static_cast<int>(connection), .events = POLL_IN, .revents{}};
+  p_fds[STDIN_IND] = {.fd = STDIN_FILENO, .events = POLLIN, .revents{}};
+
+  std::unordered_map<char, std::pair<std::string_view, std::function<void()>>> commands{
+      {'q', {"quit", []() { stop.test_and_set(); }}},
+      {'u', {"upload", []() { upload_pending.test_and_set(); }}},
+      {'h',
+       {"help",
+        [&commands]() {
+          std::cout << "commands: ";
+          for (const auto &[c, v] : commands)
+            std::cout << c << ": " << v.first << std::endl;
+          std::cout << std::endl;
+        }}},
+  };
 
   while (!stop.test()) {
     if (!upload_pending.test()) {
@@ -123,6 +140,18 @@ int main(const int argc, char **argv) {
       assert(ret != 0); // no timeout, so this should be true
       // poll can still be interrupted by EINTR
       if (ret < 0 && errno != EINTR) throw std::runtime_error(std::strerror(errno));
+
+      if (p_fds[STDIN_IND].revents & POLLIN) {
+        char c;
+        std::cin.get(c);
+        if (std::isspace(c)) { // ignore whitespace, we'll just read it next time around
+        } else if (commands.contains(c)) {
+          commands.at(c).second();
+        } else {
+          std::cerr << "unknown command: " << c << std::endl;
+        }
+      }
+
       if (p_fds[CONN_IND].revents & POLLIN) {
         download(connection, global_list, directory);
         update_list(directory);

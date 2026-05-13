@@ -25,33 +25,34 @@
 // Requires variables: buf, obuf, len
 #define CHECK_REMAIN_LEN(len, min_len) CHECK_LEN(len - (buf - obuf), (min_len))
 
+// serialize and deserialize uint32 in big endian
 size_t deserialize_uint32(uint32_t *out, const uint8_t *buf, size_t len,
                           serror_t *err) {
   CHECK_LEN(len, sizeof(uint32_t));
-  *out = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+  *out = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
   return sizeof(uint32_t);
 }
 size_t serialize_uint32(uint8_t *buf, size_t len, const uint32_t in,
                         serror_t *err) {
   CHECK_LEN(len, sizeof(uint32_t));
-  buf[0] = in & 0xFF;
-  buf[1] = (in >> 8) & 0xFF;
-  buf[2] = (in >> 16) & 0xFF;
-  buf[3] = (in >> 24) & 0xFF;
+  buf[0] = (in >> 24) & 0xFF;
+  buf[1] = (in >> 16) & 0xFF;
+  buf[2] = (in >> 8) & 0xFF;
+  buf[3] = in & 0xFF;
   return sizeof(uint32_t);
 }
 
 size_t serialize_uint16(uint8_t *buf, size_t len, const uint16_t in,
                         serror_t *err) {
   CHECK_LEN(len, sizeof(uint16_t));
-  buf[0] = in & 0xFF;
-  buf[1] = (in >> 8) & 0xFF;
+  buf[0] = (in >> 8) & 0xFF;
+  buf[1] = in & 0xFF;
   return sizeof(uint16_t);
 }
 size_t deserialize_uint16(uint16_t *out, const uint8_t *buf, size_t len,
                           serror_t *err) {
   CHECK_LEN(len, sizeof(uint16_t));
-  *out = buf[0] | (buf[1] << 8);
+  *out = (buf[0] << 8) | buf[1];
   return sizeof(uint16_t);
 }
 

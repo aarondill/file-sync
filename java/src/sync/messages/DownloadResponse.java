@@ -4,6 +4,7 @@ import java.util.List;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.stream.Stream;
 import sync.FileHash;
@@ -52,6 +53,10 @@ public class DownloadResponse implements Serialize {
     /* 128 bits for file hash (MD5) */
     for (FileHash hash : files)
       hash.serialize(out);
+  }
+  @Override
+  public String toString() {
+    return "DownloadResponse{" + "flags=" + flags + ", files=" + Arrays.toString(files) + '}';
   }
 
 }

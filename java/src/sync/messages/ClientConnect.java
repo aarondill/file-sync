@@ -57,4 +57,8 @@ public class ClientConnect implements Serialize {
     s.readFully(name_bytes);
     name = new String(name_bytes);
   }
+  @Override
+  public String toString() {
+    return "ClientConnect{" + "version=" + version + ", flags=" + flags + ", name='" + name + '\'' + '}';
+  }
 }

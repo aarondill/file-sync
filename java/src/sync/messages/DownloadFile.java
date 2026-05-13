@@ -47,5 +47,9 @@ public class DownloadFile implements Serialize {
     Path path = Path.of(name);
     return new FileInfo(path, hash, size);
   }
+  @Override
+  public String toString() {
+    return "DownloadFile{" + "hash=" + hash + ", size=" + size + ", name='" + name + '\'' + '}';
+  }
 
 }

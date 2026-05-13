@@ -36,4 +36,8 @@ public class Error implements Serialize {
     in.readFully(message_bytes);
     message = new String(message_bytes);
   }
+  @Override
+  public String toString() {
+    return "Error{" + "code=" + code + ", message='" + message + '\'' + '}';
+  }
 }

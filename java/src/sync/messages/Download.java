@@ -45,4 +45,8 @@ public class Download implements Serialize {
 
     file_count = in.readUnsignedByte();
   }
+  @Override
+  public String toString() {
+    return "Download{" + "flags=" + flags + ", file_count=" + file_count + '}';
+  }
 }

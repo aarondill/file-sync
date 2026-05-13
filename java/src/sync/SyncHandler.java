@@ -14,7 +14,7 @@ public class SyncHandler {
   Path directory;
   Collection<Sync> syncs = new ConcurrentLinkedQueue<Sync>();
 
-  void update_files() {
+  public void update_files() {
     List<FileInfo> new_files;
     try {
       new_files = FileInfo.readList(directory);

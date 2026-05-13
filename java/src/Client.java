@@ -40,7 +40,10 @@ class Handler extends Sync {
           if (c == 'u') has_upload_pending = true;
         }
         if (in.available() > 0) download(in, out, handler.get_download_state());
-        if (has_upload_pending) upload(in, out, handler.get_download_state());
+        if (has_upload_pending) {
+          handler.update_files(); // the files may have changed between the last time we checked and now
+          upload(in, out, handler.get_download_state());
+        }
         Thread.sleep(1000);
       }
     } catch (IOException e) {

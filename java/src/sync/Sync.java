@@ -118,7 +118,7 @@ public abstract class Sync implements Runnable {
       var file_stream = Files.newOutputStream(path);
       System.out.println("receiving " + path + ": " + file.hash);
       Util.transfer_bytes(in, file_stream, file.size);
-      // TODO: verify hash (?)
+      if (!new FileHash(path).equals(file.hash)) throw new IOException("Hash mismatch: " + file.name);
     }
 
     // delete files that we don't need anymore

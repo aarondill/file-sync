@@ -135,7 +135,9 @@ public abstract class Sync implements Runnable {
         p = p.getParent();
       }
     }
-    handler.schedule_upload(this);
+    if (ret.size() > 0 || to_delete.size() > 0) { // only schedule upload if we actually did something
+      handler.schedule_upload(this);
+    }
   }
 
   protected void upload(DataInputStream in, DataOutputStream out, DownloadState ds) throws IOException {

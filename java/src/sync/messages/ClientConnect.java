@@ -3,24 +3,25 @@ package sync.messages;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.stream.Stream;
 import sync.Serialize;
 
 // -- Client Connect Message --
-enum ClientConnectFlags implements Bitfield {
-  INTENT_TO_UPLOAD; // =0
-}
-
 public class ClientConnect implements Serialize {
+  public static enum Flags implements Bitfield {
+    INTENT_TO_UPLOAD; // =0
+  }
+
   static final int CLIENT_VERSION = 1;
   public int version = CLIENT_VERSION;
-  public EnumSet<ClientConnectFlags> flags;
+  public EnumSet<Flags> flags;
   public String name;
 
-  public ClientConnect(EnumSet<ClientConnectFlags> flags, String name) {
-    this.flags = flags;
+  public ClientConnect(String name, Flags... flags) {
     this.name = name;
+    this.flags = EnumSet.copyOf(Arrays.asList(flags));
   }
   @Override
   public void serialize(DataOutputStream s) throws IOException {
@@ -36,7 +37,7 @@ public class ClientConnect implements Serialize {
      */
     s.writeByte(version);
     /* 8 bits of flags */
-    s.writeByte(flags.stream().mapToInt(ClientConnectFlags::bitval).sum());
+    s.writeByte(flags.stream().mapToInt(Flags::bitval).sum());
     /* 8 bits for client name length in bytes */
     s.writeByte(name.length());
     /* human-readable client name (max of 255 bytes, variable length) */
@@ -47,8 +48,8 @@ public class ClientConnect implements Serialize {
     if (version != CLIENT_VERSION) throw new IllegalArgumentException("Unsupported version");
 
     int flags = s.readUnsignedByte();
-    this.flags = EnumSet.noneOf(ClientConnectFlags.class);
-    Stream.of(ClientConnectFlags.values()).filter(flag -> (flags & flag.bitval()) != 0).forEach(this.flags::add);
+    this.flags = EnumSet.noneOf(Flags.class);
+    Stream.of(Flags.values()).filter(flag -> (flags & flag.bitval()) != 0).forEach(this.flags::add);
 
     int name_len = s.readUnsignedByte();
 

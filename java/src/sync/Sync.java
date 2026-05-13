@@ -37,28 +37,6 @@ class Util {
       size -= n;
     }
   }
-
-  // serializes message, then writes size and message to out
-  public static void writeMessage(DataOutputStream out, Serialize message) throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    { // serialize message
-      DataOutputStream tmp = new DataOutputStream(baos);
-      message.serialize(tmp);
-      tmp.flush();
-    }
-    if (baos.size() >= Math.pow(2, 16)) throw new IOException("Message too large");
-    // write message size
-    out.writeShort(baos.size());
-    // write message
-    out.write(baos.toByteArray());
-  }
-  // reads size from in, then returns DataInputStream containing message
-  public static DataInputStream readMessage(DataInputStream in) throws IOException {
-    int size = in.readUnsignedShort();
-    byte[] ret = in.readNBytes(size);
-    if (ret.length != size) throw new IOException("Not enough bytes");
-    return new DataInputStream(new ByteArrayInputStream(ret));
-  }
 }
 
 public abstract class Sync implements Runnable {
@@ -82,10 +60,32 @@ public abstract class Sync implements Runnable {
     this(in, out, handler);
   }
 
+  // serializes message, then writes size and message to out
+  protected void writeMessage(Serialize message) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    { // serialize message
+      DataOutputStream tmp = new DataOutputStream(baos);
+      message.serialize(tmp);
+      tmp.flush();
+    }
+    if (baos.size() >= Math.pow(2, 16)) throw new IOException("Message too large");
+    // write message size
+    out.writeShort(baos.size());
+    // write message
+    out.write(baos.toByteArray());
+  }
+  // reads size from in, then returns DataInputStream containing message
+  protected DataInputStream readMessage() throws IOException {
+    int size = in.readUnsignedShort();
+    byte[] ret = in.readNBytes(size);
+    if (ret.length != size) throw new IOException("Not enough bytes");
+    return new DataInputStream(new ByteArrayInputStream(ret));
+  }
+
   private List<FileInfo> readFileList(DataInputStream in, int file_count) throws IOException {
     List<FileInfo> ret = new ArrayList<>();
     for (int i = 0; i < file_count; i++) {
-      var file = new DownloadFile(Util.readMessage(in));
+      var file = new DownloadFile(readMessage());
       ret.add(file.toFileInfo());
     }
     return ret;
@@ -93,7 +93,7 @@ public abstract class Sync implements Runnable {
 
   public void download(DataInputStream in, DataOutputStream out, DownloadState ds) throws IOException {
     //  read the download message
-    var download = new Download(Util.readMessage(in));
+    var download = new Download(readMessage());
     final List<FileInfo> recvlist = readFileList(in, download.file_count);
 
     // delete any files that the server didn't send us, but wait until the end to do this
@@ -103,10 +103,10 @@ public abstract class Sync implements Runnable {
     // We only want files that we don't already have (either no path, or a different hash)
     var filtered = recvlist.stream()
         .filter(f -> ds.files().stream().noneMatch(o -> o.name.equals(f.name) && o.hash.equals(f.hash))).toList();
-    Util.writeMessage(out, new DownloadResponse(filtered));
+    writeMessage(new DownloadResponse(filtered));
 
     // Read download message 2
-    var download2 = new Download(Util.readMessage(in));
+    var download2 = new Download(readMessage());
     var ret = readFileList(in, download2.file_count);
     // recv/write the file contents
     for (FileInfo file : ret) {
@@ -140,12 +140,12 @@ public abstract class Sync implements Runnable {
 
   protected void upload(DataInputStream in, DataOutputStream out, DownloadState ds) throws IOException {
     // send download message 1
-    Util.writeMessage(out, new Download(ds.files().size()));
+    writeMessage(new Download(ds.files().size()));
     for (FileInfo file : ds.files())
-      Util.writeMessage(out, new DownloadFile(file));
+      writeMessage(new DownloadFile(file));
 
     // receive download response
-    DownloadResponse resp = new DownloadResponse(Util.readMessage(in));
+    DownloadResponse resp = new DownloadResponse(readMessage());
     List<FileInfo> filtered_list = new ArrayList<>();
     for (FileHash hash : resp.files) {
       var p = ds.files().stream().filter(f -> f.hash.equals(hash)).findFirst();
@@ -154,9 +154,9 @@ public abstract class Sync implements Runnable {
     }
 
     // send download message 2
-    Util.writeMessage(out, new Download(filtered_list.size()));
+    writeMessage(new Download(filtered_list.size()));
     for (FileInfo file : filtered_list)
-      Util.writeMessage(out, new DownloadFile(file));
+      writeMessage(new DownloadFile(file));
     // send file contents
     for (FileInfo f : filtered_list) {
       Path path = ds.directory().resolve(f.name);

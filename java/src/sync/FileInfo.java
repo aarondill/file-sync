@@ -21,7 +21,7 @@ public class FileInfo {
     this.hash = new FileHash(path);
   }
   // Reads the directory and returns a list of all files in the directory
-  static List<FileInfo> readList(Path dir) throws IOException {
+  public static List<FileInfo> readList(Path dir) throws IOException {
     try (var s = Files.find(dir, Integer.MAX_VALUE, (p, a) -> a.isRegularFile())) {
       return s.map(p -> {
         try {

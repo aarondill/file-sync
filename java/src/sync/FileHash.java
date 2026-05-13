@@ -44,4 +44,15 @@ public class FileHash implements Serialize {
     if (o == null || getClass() != o.getClass()) return false;
     return Arrays.equals(hash, ((FileHash) o).hash);
   }
+  @Override
+  public int hashCode() {
+    return Arrays.hashCode(hash);
+  }
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder(2 * hash.length);
+    for (byte b : hash)
+      sb.append(String.format("%02x", b));
+    return sb.toString();
+  }
 }

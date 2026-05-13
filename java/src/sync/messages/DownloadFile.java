@@ -27,8 +27,8 @@ public class DownloadFile implements Serialize {
   }
   public DownloadFile(DataInputStream s) throws IOException {
     hash = new FileHash(s);
-    size = Integer.toUnsignedLong(s.readInt());
     int name_len = s.readUnsignedByte();
+    size = Integer.toUnsignedLong(s.readInt());
     byte[] name_bytes = new byte[name_len];
     s.readFully(name_bytes);
     name = new String(name_bytes);
@@ -38,8 +38,8 @@ public class DownloadFile implements Serialize {
     if (size >= Math.pow(2, 32)) throw new IllegalArgumentException("File size too large");
     if (name.length() >= Math.pow(2, 8)) throw new IllegalArgumentException("File name too long");
     hash.serialize(s);
-    s.writeInt((int) size);
     s.writeByte(name.length());
+    s.writeInt((int) size);
     s.writeBytes(name);
   }
 

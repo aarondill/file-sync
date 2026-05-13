@@ -5,6 +5,7 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.Socket;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import sync.Sync;
 import sync.SyncHandler;
@@ -58,12 +59,22 @@ public class Client extends SyncHandler {
   }
 
   public static void main(String[] args) throws IOException {
-    if (args.length != 2) {
+    // argument parsing
+    List<String> flags = new ArrayList<>(), params = new ArrayList<>();
+    for (int i = 0; i < args.length; i++) {
+      if (args[i].equals("--")) {
+        Arrays.stream(args, i + 1, args.length).forEach(params::add);
+        break;
+      } else if (args[i].startsWith("-")) {
+        flags.add(args[i]);
+      } else {
+        params.add(args[i]);
+      }
+    }
+    if (params.size() != 2) {
       System.err.println("usage: Client -u <server-url> <directory>");
       System.exit(2);
     }
-    List<String> flags = Arrays.stream(args).filter(s -> s.startsWith("-")).toList();
-    List<String> params = Arrays.stream(args).filter(s -> !s.startsWith("-")).toList();
 
     boolean upload = flags.contains("-u");
     String[] split = params.get(0).split(":");

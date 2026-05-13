@@ -16,12 +16,12 @@ public class ClientConnect implements Serialize {
 
   static final int CLIENT_VERSION = 1;
   public int version = CLIENT_VERSION;
-  public EnumSet<Flags> flags;
+  public EnumSet<Flags> flags = EnumSet.noneOf(Flags.class);
   public String name;
 
   public ClientConnect(String name, Flags... flags) {
     this.name = name;
-    this.flags = EnumSet.copyOf(Arrays.asList(flags));
+    Arrays.stream(flags).forEach(this.flags::add);
   }
   @Override
   public void serialize(DataOutputStream s) throws IOException {

@@ -139,6 +139,7 @@ public abstract class Sync implements Runnable {
   }
 
   protected void upload(DataInputStream in, DataOutputStream out, DownloadState ds) throws IOException {
+    has_upload_pending = false;
     // send download message 1
     writeMessage(new Download(ds.files().size()));
     for (FileInfo file : ds.files())

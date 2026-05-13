@@ -1,4 +1,5 @@
 import java.util.List;
+import java.util.Map;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -18,6 +19,24 @@ class Handler extends Sync {
     super(s, handler);
     this.initial_upload = initial_upload;
   }
+
+  // set to false to stop the client gracefully
+  boolean running = true;
+
+  record UserCommand(String description, Runnable command) {}
+
+  Map<Character, UserCommand> commands = Map.of( //
+      'q', new UserCommand("Quit", () -> running = false), // 
+      'u', new UserCommand("Upload", () -> has_upload_pending = true), //
+      'h', new UserCommand("Help", () -> printHelp()) //
+  );
+
+  private void printHelp() {
+    System.out.println("Commands:");
+    for (var entry : commands.entrySet())
+      System.out.printf("  %c: %s\n", entry.getKey(), entry.getValue().description());
+  }
+
   @Override
   public void run() {
     try {
@@ -33,12 +52,15 @@ class Handler extends Sync {
       this.writeMessage(msg);
 
       System.in.skip(System.in.available()); // clear input buffer
-      while (true) {
-        if (System.in.available() > 0) {
+      while (running) {
+        while (System.in.available() > 0) {
           char c = (char) System.in.read();
-          if (c == 'q') break;
-          if (c == 'u') has_upload_pending = true;
+          if (Character.isWhitespace(c)) continue; // skip whitespace
+          UserCommand cmd = commands.get(c);
+          if (cmd != null) cmd.command().run();
+          else System.out.println("Unknown command: " + c);
         }
+        if (!running) break; // don't make them wait if they requested to quit
         if (in.available() > 0) download(in, out, handler.get_download_state());
         if (has_upload_pending) {
           handler.update_files(); // the files may have changed between the last time we checked and now
@@ -51,6 +73,7 @@ class Handler extends Sync {
     } catch (InterruptedException e) {
       e.printStackTrace();
     } finally {
+      System.out.println("Closing connection");
       handler.remove(this);
     }
   }

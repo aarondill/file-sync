@@ -1,0 +1,21 @@
+{
+  "name": "file-sync",
+  "version": "0.0.0",
+  "private": true,
+  "description": "File sync server/client",
+  "repository": "https://github.com/aarondill/file-sync",
+  "license": "MIT",
+  "author": "aarondill <aaronsacks2006@gmail.com>",
+  "type": "module",
+  "scripts": {
+    "start": "node ./src/server.ts",
+    "client": "node ./src/client.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "tsafe": "^1.8.12"
+  }
+}

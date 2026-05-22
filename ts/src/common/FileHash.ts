@@ -2,6 +2,7 @@ import assert from "node:assert";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { createReadStream, type PathLike } from "node:fs";
+import { inspect } from "node:util";
 import type { Serializable } from "./messages.ts";
 
 export class FileHash implements Serializable {
@@ -33,4 +34,7 @@ export class FileHash implements Serializable {
   toString() {
     return Buffer.from(this.hash).toString("hex");
   }
+  [inspect.custom] = () => {
+    return this.toString();
+  };
 }

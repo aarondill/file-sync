@@ -71,7 +71,7 @@ export class Download implements Serializable {
       throw new Error("Attempt to deserialize error message");
     const fileCount = buffer.readUint8(offset);
     offset += 1;
-    return [new Download(flags, fileCount), offset];
+    return [new Download(fileCount, flags), offset];
   }
   serialize(): Buffer {
     assert.equal(this.flags & Download.FLAGS.ERROR, 0, "error flag set");

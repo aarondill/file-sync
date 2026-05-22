@@ -45,7 +45,7 @@ export async function download(
   const filtered = recvlist.filter(f =>
     files.every(o => o.name !== f.name || o.hash !== f.hash)
   );
-  writeMessage(io, new DownloadResponse(filtered.map(f => f.hash)));
+  await writeMessage(io, new DownloadResponse(filtered.map(f => f.hash)));
 
   // read download message 2
   const [download2] = Download.deserialize(await readMessage(io));

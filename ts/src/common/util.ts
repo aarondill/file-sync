@@ -19,7 +19,7 @@ export async function writeMessage(out: Writable, message: Serializable) {
 
 async function readBytes(input: Readable, bytes: number): Promise<Buffer> {
   assert(input.readable);
-  let buf = Buffer.alloc(bytes);
+  const buf = Buffer.alloc(bytes);
   let got = 0;
   while (got < bytes) {
     await once(input, "readable");

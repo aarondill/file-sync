@@ -50,14 +50,14 @@ async function main(): Promise<number | undefined> {
     )
   );
 
-  updateList(directory);
+  await updateList(directory);
   // call upload.resolve() to start uploading; await upload.promise to wait for a new upload
   let upPending = Promise.withResolvers<void>();
-  const resetUpload = () => (upPending = Promise.withResolvers<void>());
+  const resetUpload = () => (upPending = Promise.withResolvers());
 
   if (should_upload) upPending.resolve();
 
-  let stop = new AbortController();
+  const stop = new AbortController();
   process.on("SIGTERM", () => stop.abort());
   process.on("SIGINT", () => stop.abort());
   process.on("SIGQUIT", () => stop.abort());
@@ -100,11 +100,12 @@ async function main(): Promise<number | undefined> {
         await upload(socket, global_list, directory);
         resetUpload();
         break;
-      case DOWNLOAD:
+      case DOWNLOAD: {
         const changed = await download(socket, global_list, directory);
         // only need to update the list if we actually did something
         if (changed) await updateList(directory);
         break;
+      }
       case STOP:
         break; // the next iteration will terminate the loop
       default:

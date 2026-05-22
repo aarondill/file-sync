@@ -30,4 +30,7 @@ export class FileHash implements Serializable {
   equals(other: FileHash) {
     return Buffer.compare(this.hash, other.hash) === 0;
   }
+  toString() {
+    return Buffer.from(this.hash).toString("hex");
+  }
 }

@@ -32,7 +32,7 @@ async function main(): Promise<number | undefined> {
     console.error(`directory ${directory} is not readable or writable`);
     return 3;
   }
-  updateList(directory);
+  await updateList(directory);
   process.on("SIGTERM", () => stop.abort());
   process.on("SIGINT", () => stop.abort());
   process.on("SIGQUIT", () => stop.abort());
@@ -95,7 +95,7 @@ async function handleClient(socket: Socket, directory: string) {
         await upload(socket, global_list, directory);
         resetUpload();
         break;
-      case DOWNLOAD:
+      case DOWNLOAD: {
         const changed = await download(socket, global_list, directory);
         // only need to update the list if we actually did something
         if (changed) {
@@ -106,6 +106,7 @@ async function handleClient(socket: Socket, directory: string) {
           }
         }
         break;
+      }
       case STOP:
         break; // the next iteration will terminate the loop
       default:

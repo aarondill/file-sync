@@ -61,6 +61,7 @@ export async function download(
     const fileStream = createWriteStream(p);
     await transferBytes(io, fileStream, file.size);
     fileStream.close();
+    await once(fileStream, "close");
     assert(await file.hash.verify(p), `hash mismatch: ${file.name}`);
   }
 

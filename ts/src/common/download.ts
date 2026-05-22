@@ -7,7 +7,11 @@ import { FileInfo } from "./FileInfo.ts";
 import { Download, DownloadFile, DownloadResponse } from "./messages.ts";
 import { readMessage, transferBytes, writeMessage } from "./util.ts";
 // `rmdir -p`; remove a directory and all its parents
-const rmdir_p = async (dir: string) => {
+const rmdir_p = async (dir: string, stop_at?: string) => {
+  if (stop_at) {
+    stop_at = path.normalize(stop_at);
+    if (dir == stop_at) return;
+  }
   if (!dir) return;
   const err = await fs.rmdir(dir).catch(e => e);
   if (err) {
@@ -66,7 +70,7 @@ export async function download(
     console.log("deleting: " + p);
     await fs.rm(p);
 
-    await rmdir_p(path.dirname(p)).catch(e => console.error(e));
+    await rmdir_p(path.dirname(p), directory).catch(e => console.error(e));
   }
   // return true if we actually did something
   return ret.length > 0 || to_delete.length > 0;

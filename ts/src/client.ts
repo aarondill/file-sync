@@ -4,20 +4,16 @@ import { Socket } from "node:net";
 import os from "node:os";
 import { parseArgs } from "node:util";
 import { download } from "./common/download.ts";
+import { FileInfo } from "./common/FileInfo.ts";
 import { ClientConnect } from "./common/messages.ts";
 import { upload } from "./common/upload.ts";
-import { writeMessage } from "./common/util.ts";
+import { access, writeMessage } from "./common/util.ts";
 
-let global_list: null = null; // TODO:
+let global_list: FileInfo[] = [];
 // No locking is required here, since the client is single-threaded
 async function updateList(directory: string) {
-  // global_list = file_list_read(directory);
+  global_list = await FileInfo.readList(directory);
 }
-const access = (...args: Parameters<typeof fs.access>) =>
-  fs
-    .access(...args)
-    .then(() => true)
-    .catch(() => false);
 
 async function main(): Promise<number | undefined> {
   const { values, positionals } = parseArgs({
@@ -99,12 +95,14 @@ async function main(): Promise<number | undefined> {
     ]);
     switch (which) {
       case UPLOAD:
+        await updateList(directory);
         await upload(socket, global_list, directory);
         resetUpload();
         break;
       case DOWNLOAD:
-        await download(socket, global_list, directory);
-        await updateList(directory);
+        const changed = await download(socket, global_list, directory);
+        // only need to update the list if we actually did something
+        if (changed) await updateList(directory);
         break;
       case STOP:
         break; // the next iteration will terminate the loop

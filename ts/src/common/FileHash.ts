@@ -24,4 +24,10 @@ export class FileHash implements Serializable {
     const slice = buffer.subarray(offset, offset + 16);
     return [new FileHash(slice), offset + 16];
   }
+  async verify(path: PathLike) {
+    return this.equals(await FileHash.fromPath(path));
+  }
+  equals(other: FileHash) {
+    return Buffer.compare(this.hash, other.hash) === 0;
+  }
 }

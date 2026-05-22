@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import { once } from "node:events";
+import fs from "node:fs/promises";
 import type { Readable, Writable } from "node:stream";
 import type { Serializable } from "./messages.ts";
 
@@ -41,3 +42,27 @@ export async function readMessage(input: Readable) {
   // read buf from input
   return await readBytes(input, bytes);
 }
+
+export async function transferBytes(
+  input: Readable,
+  output: Writable,
+  bytes: number
+) {
+  let got = 0;
+  while (got < bytes) {
+    await once(input, "readable");
+    const toRead = Math.min(bytes - got, input.readableLength);
+    const read = input.read(toRead) as unknown;
+    if (read === null)
+      throw new Error(`unexpected EOF after reading ${got} of ${bytes} bytes`);
+    assert(read instanceof Buffer);
+
+    await writeBytes(output, read);
+    got += read.length;
+  }
+}
+export const access = (...args: Parameters<typeof fs.access>) =>
+  fs.access(...args).then(
+    () => true,
+    () => false
+  );

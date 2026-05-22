@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { once } from "node:events";
 import fs from "node:fs/promises";
 import { createServer, Socket } from "node:net";
@@ -36,16 +37,29 @@ async function main(): Promise<number | undefined> {
   process.on("SIGINT", () => stop.abort());
   process.on("SIGQUIT", () => stop.abort());
 
-  // await using socket = new Socket().connect({ port, host });
-  createServer(socket => {
-    handleClient(socket, directory);
-  }).listen(port);
+  await using server = createServer(async socket => {
+    try {
+      await handleClient(socket, directory);
+    } catch (e) {
+      console.error("error handling client", e);
+    }
+  }).listen({ port, reusePort: true });
+  const address = server.address();
+  assert(address && typeof address === "object");
+  console.log(`listening on port ${address.port}`);
+  stop.signal.addEventListener("abort", () => {
+    console.log("stopping server");
+    server.close();
+  });
+  await once(server, "close");
 }
 
 // a list of functions to be called to start an upload.
 const allClientUploads: Set<() => void> = new Set();
 
 async function handleClient(socket: Socket, directory: string) {
+  await using _disposer = new AsyncDisposableStack();
+  _disposer.use(socket); // cleanup socket on exit
   // recv connect message
   const [msg] = ClientConnect.deserialize(await readMessage(socket));
   console.log(`Client connected: ${msg.clientName}`);
@@ -58,8 +72,9 @@ async function handleClient(socket: Socket, directory: string) {
   const global_up_fn = () => upPending.resolve();
   allClientUploads.add(global_up_fn);
   // remove from array on return
-  using _disposer = new DisposableStack();
-  _disposer.adopt(global_up_fn, () => allClientUploads.delete(global_up_fn));
+  _disposer.adopt(global_up_fn, () => {
+    allClientUploads.delete(global_up_fn);
+  });
 
   // we should upload if they client isn't going to
   const should_upload = (msg.flags & ClientConnect.FLAGS.INTENT_TO_UPLOAD) == 0;

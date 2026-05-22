@@ -135,7 +135,7 @@ export class DownloadResponse implements Serializable {
     const hashes: FileHash[] = [];
     for (let i = 0; i < fileCount; i++) {
       let hash;
-      [hash, offset] = FileHash.deserialize(buffer);
+      [hash, offset] = FileHash.deserialize(buffer, offset);
       hashes.push(hash);
     }
     return [new DownloadResponse(hashes, flags), offset];

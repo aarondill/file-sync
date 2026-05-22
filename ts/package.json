@@ -12,8 +12,11 @@
     "client": "node ./src/client.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.5.2",
-    "typescript": "^5.8.3"
+    "eslint": "^10.4.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.59.4"
   },
   "dependencies": {
     "tsafe": "^1.8.12"

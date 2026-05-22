@@ -92,8 +92,7 @@ Each file header is 21 bytes
     - server identifies file by hash
     - respond with error if hash not found (must process all names before initiating download)
 
-Total header size is 2 bytes
-Each file header is 16 bytes
+Total header size is 2 bytes + file count \* 16 bytes
 
 ### Error message
 

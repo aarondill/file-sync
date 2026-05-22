@@ -9,6 +9,7 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "erasableSyntaxOnly": true,
     "noUncheckedIndexedAccess": true,
     "module": "nodenext",
     "moduleResolution": "nodenext",

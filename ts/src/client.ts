@@ -39,6 +39,7 @@ async function main(): Promise<number | undefined> {
   const [host, portstr] = server.split(":");
   const port = parseInt(portstr ?? "8080");
   await using socket = new Socket().connect({ port, host });
+  await once(socket, "connect");
 
   // send connect message
   await writeMessage(

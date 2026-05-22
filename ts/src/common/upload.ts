@@ -25,7 +25,7 @@ export async function upload(io: Duplex, files: FileInfo[], directory: string) {
   for (const file of filtered_list) {
     const p = path.join(directory, file.name);
     const stream = createReadStream(p);
-    console.log(`sending: ${p}: ${file.hash}`);
+    console.log(`sending: ${p}: ${file.hash.toString()}`);
     await transferBytes(stream, io, file.size);
     if (stream.read() !== null) throw new Error("file too large");
     stream.close();

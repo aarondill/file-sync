@@ -47,7 +47,7 @@ export async function download(
   // write the download response
   // We only want files that we don't already have (either no path, or a different hash)
   const filtered = recvlist.filter(f =>
-    files.every(o => o.name !== f.name || o.hash !== f.hash)
+    files.every(o => o.name !== f.name || !o.hash.equals(f.hash))
   );
   await writeMessage(io, new DownloadResponse(filtered.map(f => f.hash)));
 

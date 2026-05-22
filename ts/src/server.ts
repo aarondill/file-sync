@@ -40,6 +40,7 @@ async function main(): Promise<number | undefined> {
   await using server = createServer(async socket => {
     try {
       await handleClient(socket, directory);
+      console.log("client disconnected");
     } catch (e) {
       console.error("error handling client", e);
     }
@@ -80,14 +81,14 @@ async function handleClient(socket: Socket, directory: string) {
   const should_upload = (msg.flags & ClientConnect.FLAGS.INTENT_TO_UPLOAD) == 0;
   if (should_upload) upPending.resolve();
 
-  const UPLOAD = {},
-    DOWNLOAD = {},
-    STOP = {};
+  const UPLOAD = "UPLOAD",
+    DOWNLOAD = "DOWNLOAD",
+    STOP = "STOP";
   while (!stop.signal.aborted) {
     const which = await Promise.race([
       upPending.promise.then(() => UPLOAD),
       once(socket, "readable").then(() => DOWNLOAD),
-      once(stop.signal, "aborted").then(() => STOP),
+      once(stop.signal, "abort").then(() => STOP),
     ]);
     switch (which) {
       case UPLOAD:
@@ -96,6 +97,7 @@ async function handleClient(socket: Socket, directory: string) {
         resetUpload();
         break;
       case DOWNLOAD: {
+        if (!socket.readable) return;
         const changed = await download(socket, global_list, directory);
         // only need to update the list if we actually did something
         if (changed) {
@@ -108,7 +110,7 @@ async function handleClient(socket: Socket, directory: string) {
         break;
       }
       case STOP:
-        break; // the next iteration will terminate the loop
+        return;
       default:
         throw new Error("unreachable");
     }

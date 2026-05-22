@@ -75,6 +75,7 @@ async function main(): Promise<number | undefined> {
       desc: "help",
     },
   };
+  using _dispose = new DisposableStack();
 
   process.stdin.setEncoding("utf8").on("data", data => {
     const str = data.toString();
@@ -85,14 +86,16 @@ async function main(): Promise<number | undefined> {
       else console.error(`unknown command: ${char}`);
     }
   });
-  const UPLOAD = {},
-    DOWNLOAD = {},
-    STOP = {};
+  _dispose.defer(() => process.stdin.pause());
+
+  const UPLOAD = "UPLOAD",
+    DOWNLOAD = "DOWNLOAD",
+    STOP = "STOP";
   while (!stop.signal.aborted) {
     const which = await Promise.race([
       upPending.promise.then(() => UPLOAD),
       once(socket, "readable").then(() => DOWNLOAD),
-      once(stop.signal, "aborted").then(() => STOP),
+      once(stop.signal, "abort").then(() => STOP),
     ]);
     switch (which) {
       case UPLOAD:
@@ -112,6 +115,7 @@ async function main(): Promise<number | undefined> {
         throw new Error("unreachable");
     }
   }
+  socket.destroySoon();
 }
 process.addListener("unhandledRejection", (reason, promise) => {
   console.error("unhandled rejection", reason, promise); // don't exit the process

@@ -104,18 +104,19 @@ async function main(): Promise<number | undefined> {
         resetUpload();
         break;
       case DOWNLOAD: {
+        if (!socket.readable) return; // socket closed
+        await updateList(directory); // a precaution since files may have changed while waiting (warn if they did?)
         const changed = await download(socket, global_list, directory);
         // only need to update the list if we actually did something
         if (changed) await updateList(directory);
         break;
       }
       case STOP:
-        break; // the next iteration will terminate the loop
+        return;
       default:
         throw new Error("unreachable");
     }
   }
-  socket.destroySoon();
 }
 process.addListener("unhandledRejection", (reason, promise) => {
   console.error("unhandled rejection", reason, promise); // don't exit the process

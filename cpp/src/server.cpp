@@ -18,7 +18,6 @@
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
-#include <unordered_set>
 
 struct client_info {
   FileDescriptor conn;
@@ -38,7 +37,7 @@ struct client_info {
 };
 
 // each thread receives a pointer to its client_list
-std::shared_mutex client_mutex; // TODO:
+std::shared_mutex client_mutex;
 // you *must* lock any time you access this
 /*
  * Use a list instead of a vector to avoid invalidating references
@@ -67,7 +66,7 @@ void write_other_clients(const client_info &cur) {
     } catch (std::exception &) {} // don't let bad threads kill this one
 }
 
-std::shared_mutex file_mutex; // TODO:
+std::shared_mutex file_mutex;
 std::vector<FileInfo> global_list;
 void update_list(const fs::path &directory) {
   auto list = FileInfo::readList(directory);

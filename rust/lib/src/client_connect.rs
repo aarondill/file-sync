@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use std::{io::Read, io::Write};
 
-use crate::protocol::{Deserialize, Serialize};
+use crate::protocol::{Deserialize, Serialize, VariableLengthString};
 const PROTOCOL_VERSION: u8 = 2;
 
 bitflags! {
@@ -15,22 +15,15 @@ bitflags! {
 pub struct ClientConnect {
     protocol_version: u8,
     flags: ClientConnectFlags,
-    client_name_length: u8,
-    client_name: [u8; 255],
+    client_name: VariableLengthString,
 }
 
 impl ClientConnect {
     pub fn new(flags: ClientConnectFlags, client_name: &[u8]) -> Self {
-        let client_name_length = client_name.len();
-        assert!(client_name_length <= 255, "client name too long");
-        let mut name = [0; 255];
-        name[..client_name_length].copy_from_slice(client_name);
-
         Self {
             protocol_version: PROTOCOL_VERSION,
             flags,
-            client_name_length: client_name_length as u8,
-            client_name: name,
+            client_name: client_name.try_into().expect("name too long"),
         }
     }
 }
@@ -39,8 +32,7 @@ impl Serialize for ClientConnect {
     fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
         writer.write_all(&self.protocol_version.to_be_bytes())?;
         writer.write_all(&self.flags.bits().to_be_bytes())?;
-        writer.write_all(&self.client_name_length.to_be_bytes())?;
-        writer.write_all(&self.client_name[..self.client_name_length as usize])?;
+        self.client_name.serialize(writer)?;
         Ok(())
     }
 }
@@ -55,15 +47,11 @@ impl Deserialize for ClientConnect {
         let flags: u8 = bytes.next().expect("flags missing")?;
         let flags = ClientConnectFlags::from_bits(flags).expect("invalid flags");
 
-        let client_name_length: u8 = bytes.next().expect("client name length missing")?;
-
-        let mut client_name: [u8; 255] = [0; 255];
-        reader.read_exact(&mut client_name[..client_name_length as usize])?;
+        let client_name = VariableLengthString::deserialize(reader)?;
 
         Ok(Self {
             protocol_version,
             flags,
-            client_name_length,
             client_name,
         })
     }

@@ -1,7 +1,10 @@
 use bitflags::bitflags;
 use std::{io::Read, io::Write};
 
-use crate::protocol::{Deserialize, Serialize, VariableLengthString};
+use crate::{
+    protocol::{Deserialize, Serialize},
+    variable_length_string::VariableLengthString,
+};
 const PROTOCOL_VERSION: u8 = 2;
 
 bitflags! {
@@ -19,11 +22,11 @@ pub struct ClientConnect {
 }
 
 impl ClientConnect {
-    pub fn new(flags: ClientConnectFlags, client_name: &[u8]) -> Self {
+    pub fn new(flags: ClientConnectFlags, client_name: VariableLengthString) -> Self {
         Self {
             protocol_version: PROTOCOL_VERSION,
             flags,
-            client_name: client_name.try_into().expect("name too long"),
+            client_name,
         }
     }
 }
@@ -62,7 +65,10 @@ mod tests {
     use super::*;
     #[test]
     fn serialize_works() {
-        let test = ClientConnect::new(ClientConnectFlags::IntentToUpload, "test".as_bytes());
+        let test = ClientConnect::new(
+            ClientConnectFlags::IntentToUpload,
+            "test".try_into().unwrap(),
+        );
         let mut bytes = Vec::<u8>::new();
         test.serialize(&mut bytes).expect("failed to serialize");
 
@@ -74,13 +80,16 @@ mod tests {
         let bytes = [PROTOCOL_VERSION, 0b00000001, 4, b't', b'e', b's', b't'];
         let res = ClientConnect::deserialize(&mut &bytes[..]).expect("failed to serialize");
 
-        let expected = ClientConnect::new(ClientConnectFlags::IntentToUpload, "test".as_bytes());
+        let expected = ClientConnect::new(
+            ClientConnectFlags::IntentToUpload,
+            "test".try_into().unwrap(),
+        );
         assert_eq!(res, expected);
     }
     #[test]
     fn it_works() {
         let name = "this is a test of the client connect protocol";
-        let test = ClientConnect::new(ClientConnectFlags::empty(), name.as_bytes());
+        let test = ClientConnect::new(ClientConnectFlags::empty(), name.try_into().unwrap());
         let mut bytes = Vec::<u8>::new();
         test.serialize(&mut bytes).expect("failed to serialize");
 

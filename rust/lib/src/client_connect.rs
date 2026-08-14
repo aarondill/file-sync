@@ -33,21 +33,20 @@ impl ClientConnect {
 
 impl Serialize for ClientConnect {
     fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
-        writer.write_all(&self.protocol_version.to_be_bytes())?;
-        writer.write_all(&self.flags.bits().to_be_bytes())?;
+        self.protocol_version.serialize(writer)?;
+        self.flags.bits().serialize(writer)?;
         self.client_name.serialize(writer)?;
         Ok(())
     }
 }
 impl Deserialize for ClientConnect {
     fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut bytes = reader.bytes();
-        let protocol_version = bytes.next().expect("protocol version missing")?;
+        let protocol_version = u8::deserialize(reader)?;
         if protocol_version != PROTOCOL_VERSION {
             return Err("protocol version mismatch".into());
         }
 
-        let flags: u8 = bytes.next().expect("flags missing")?;
+        let flags = u8::deserialize(reader)?;
         let flags = ClientConnectFlags::from_bits(flags).expect("invalid flags");
 
         let client_name = VariableLengthString::deserialize(reader)?;

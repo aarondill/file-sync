@@ -46,7 +46,7 @@ impl std::convert::TryFrom<&str> for VariableLengthString {
 }
 
 impl std::convert::Into<String> for VariableLengthString {
-    fn into(self: Self) -> String {
+    fn into(self) -> String {
         return self.to_string();
     }
 }
@@ -67,6 +67,7 @@ impl Serialize for VariableLengthString {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
     #[test]

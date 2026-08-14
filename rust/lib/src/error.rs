@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use std::{io::Read, io::Write};
 
 use crate::{
-    protocol::{Deserialize, Serialize},
+    serial::{Deserialize, Serialize},
     variable_length_string::VariableLengthString,
 };
 

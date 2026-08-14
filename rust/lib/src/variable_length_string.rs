@@ -1,4 +1,4 @@
-use crate::protocol::{Deserialize, Serialize};
+use crate::serial::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 /// A variable length string stored on the stack as a length byte followed by the bytes.

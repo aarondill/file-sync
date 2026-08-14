@@ -3,7 +3,7 @@ use std::{io::Read, io::Write};
 
 use crate::{
     file_hash::FileHash,
-    protocol::{Deserialize, Serialize},
+    serial::{Deserialize, Serialize},
 };
 
 bitflags! {

@@ -1,4 +1,4 @@
-use crate::protocol::{Deserialize, Serialize};
+use crate::serial::{Deserialize, Serialize};
 use std::io::Read;
 pub mod client_connect;
 pub mod download_file;
@@ -7,7 +7,7 @@ pub mod download_response;
 pub mod error;
 pub mod file_hash;
 pub mod file_info;
-pub mod protocol;
+pub mod serial;
 pub mod variable_length_string;
 
 pub fn read_message(reader: &mut dyn Read) -> Result<Vec<u8>, Box<dyn std::error::Error>> {

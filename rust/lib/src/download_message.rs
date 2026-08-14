@@ -3,7 +3,7 @@ use std::{io::Read, io::Write};
 
 use crate::{
     download_file::DownloadFile,
-    protocol::{Deserialize, Serialize},
+    serial::{Deserialize, Serialize},
 };
 
 bitflags! {

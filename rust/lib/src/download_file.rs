@@ -1,5 +1,5 @@
 use crate::file_hash::FileHash;
-use crate::protocol::{Deserialize, Serialize};
+use crate::serial::{Deserialize, Serialize};
 use crate::variable_length_string::VariableLengthString;
 use std::{io::Read, io::Write};
 

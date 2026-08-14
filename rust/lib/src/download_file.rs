@@ -1,6 +1,8 @@
 use crate::file_hash::FileHash;
+use crate::file_info::FileInfo;
 use crate::serial::{Deserialize, Serialize};
 use crate::variable_length_string::VariableLengthString;
+use std::os::unix::ffi::OsStrExt;
 use std::{io::Read, io::Write};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -22,6 +24,30 @@ pub struct DownloadFile {
 impl DownloadFile {
     pub fn new(hash: FileHash, size: u32, name: VariableLengthString) -> Self {
         Self { hash, size, name }
+    }
+}
+
+impl std::convert::Into<FileInfo> for DownloadFile {
+    fn into(self) -> FileInfo {
+        FileInfo::new(
+            self.name.to_string().into(),
+            self.hash,
+            self.size.try_into().expect("size too large"),
+        )
+    }
+}
+
+impl std::convert::From<&FileInfo> for DownloadFile {
+    fn from(info: &FileInfo) -> Self {
+        Self::new(
+            info.hash().clone(),
+            info.size().try_into().expect("size too large"),
+            info.path()
+                .to_string_lossy()
+                .as_bytes()
+                .try_into()
+                .expect("name too long"),
+        )
     }
 }
 

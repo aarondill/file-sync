@@ -20,6 +20,12 @@ pub struct DownloadResponse {
 }
 
 impl DownloadResponse {
+    pub fn flags(&self) -> &Flags {
+        &self.flags
+    }
+    pub fn into_files(self) -> Vec<FileHash> {
+        self.files
+    }
     pub fn new(flags: Flags, files: Vec<FileHash>) -> Self {
         assert!(!flags.contains(Flags::isError));
         u8::try_from(files.len()).expect("too many files");

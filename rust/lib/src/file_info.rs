@@ -8,15 +8,25 @@ use walkdir::WalkDir;
 
 use crate::file_hash::FileHash;
 
-struct FileInfo {
+pub struct FileInfo {
     // A relative path from the base directory
     path: PathBuf,
     hash: FileHash,
     size: u64,
 }
 impl FileInfo {
-    // explicit FileInfo(const fs::path &path, const fs::path &base)
-    //     : path{path.lexically_relative(base)}, hash{path}, size{file_size(path)} {}
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn hash(&self) -> &FileHash {
+        &self.hash
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
     pub fn new(path: PathBuf, hash: FileHash, size: u64) -> FileInfo {
         FileInfo { path, hash, size }
     }

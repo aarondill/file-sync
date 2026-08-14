@@ -1,6 +1,5 @@
-use core::io;
 use std::{
-    fs::{self, Dir, DirEntry, File},
+    fs::File,
     path::{Path, PathBuf},
 };
 
@@ -36,7 +35,7 @@ impl FileInfo {
     ) -> Result<FileInfo, Box<dyn std::error::Error>> {
         let path = base.join(path);
         let size = path.metadata()?.len();
-        let mut file = File::open(path)?;
+        let mut file = File::open(&path)?;
         let hash = FileHash::new(&mut file)?;
         Ok(FileInfo { path, hash, size })
     }

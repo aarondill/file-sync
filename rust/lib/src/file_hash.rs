@@ -1,3 +1,5 @@
+use std::borrow::{Borrow, BorrowMut};
+
 use crate::serial::{Deserialize, Serialize};
 use digest_io::IoWrapper;
 use md5::{Digest, Md5};
@@ -19,6 +21,11 @@ impl FileHash {
             s.push_str(&format!("{:02x}", b));
         }
         s
+    }
+}
+impl std::fmt::Display for FileHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.hex())
     }
 }
 impl std::fmt::Debug for FileHash {

@@ -2,7 +2,6 @@ use crate::file_hash::FileHash;
 use crate::file_info::FileInfo;
 use crate::serial::{Deserialize, Serialize};
 use crate::variable_length_string::VariableLengthString;
-use std::os::unix::ffi::OsStrExt;
 use std::{io::Read, io::Write};
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -1,5 +1,5 @@
 use crate::serial::{Deserialize, Serialize};
-use std::io::Read;
+use std::{borrow::Borrow, io::Read};
 
 pub fn read_message(reader: &mut dyn Read) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let len = u16::deserialize(reader)? as usize;

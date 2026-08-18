@@ -4,13 +4,17 @@ use crate::{
     download_response::DownloadResponse,
     file_info::FileInfo,
     protocol::{read_message, write_message},
-    serial,
+    serial::{Deserialize, Serialize},
 };
-use serial::{Deserialize, Serialize};
-use std::{borrow::Borrow, io::Write, net::TcpStream, path::Path};
+use std::{borrow::Borrow, path::Path};
+use tokio::{
+    fs::File,
+    io::{AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+};
 
-fn write_file_list<T: Borrow<FileInfo>>(
-    socket: &mut dyn Write,
+async fn write_file_list<T: Borrow<FileInfo>>(
+    socket: &mut (dyn AsyncWrite + Unpin),
     list: &[T],
     srcdir: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -20,22 +24,26 @@ fn write_file_list<T: Borrow<FileInfo>>(
         let f: DownloadFile = node.borrow().into();
         f.serialize(&mut buf)
             .expect("error serializing download file");
-        write_message(socket, &buf)?;
+        write_message(socket, &buf).await?;
         buf.clear();
     }
     if let Some(srcdir) = srcdir {
         // Send file contents
-        for node in list {
-            let path = srcdir.join(node.borrow().path());
-            let mut file = std::fs::File::open(path)?;
-            std::io::copy(&mut file, socket)?;
+        for path in list
+            .iter()
+            .map(Borrow::borrow)
+            .map(|p| srcdir.join(p.path()))
+        {
+            let mut file = File::open(path).await?;
+            tokio::io::copy(&mut file, socket).await?;
+            file.flush().await?;
         }
     }
     Ok(())
 }
 
-fn write_download_message<T: Borrow<FileInfo>>(
-    socket: &mut dyn Write,
+async fn write_download_message<T: Borrow<FileInfo>>(
+    socket: &mut (dyn AsyncWrite + Unpin),
     list: &[T],
     srcdir: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -46,20 +54,20 @@ fn write_download_message<T: Borrow<FileInfo>>(
     let mut buf = Vec::with_capacity(4096);
     msg.serialize(&mut buf)
         .expect("error serializing download message");
-    write_message(socket, &buf)?;
-    write_file_list(socket, list, srcdir)
+    write_message(socket, &buf).await?;
+    write_file_list(socket, list, srcdir).await
 }
 
-pub fn upload(
+pub async fn upload(
     socket: &mut TcpStream,
     files: &[FileInfo],
     srcdir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Send download message 1
-    write_download_message(socket, files, None)?;
+    write_download_message(socket, files, None).await?;
 
     // Receive download response
-    let msg = read_message(socket)?;
+    let msg = read_message(socket).await?;
     let mut cursor = std::io::Cursor::new(msg);
     let resp = DownloadResponse::deserialize(&mut cursor)?;
     assert_eq!(cursor.position(), cursor.into_inner().len() as u64); // EOF
@@ -75,6 +83,6 @@ pub fn upload(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    write_download_message(socket, &filtered_list, Some(srcdir))?;
+    write_download_message(socket, &filtered_list, Some(srcdir)).await?;
     Ok(())
 }

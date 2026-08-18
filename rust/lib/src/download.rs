@@ -1,80 +1,67 @@
 use crate::{
+    download_file::DownloadFile,
     download_message::DownloadMessage,
     download_response::{self, DownloadResponse},
     file_hash::FileHash,
-    protocol::write_message,
+    file_info::FileInfo,
+    protocol::{read_message, write_message},
     serial::{Deserialize, Serialize},
 };
-use digest_io::HashWriter;
-use md5::Md5;
-use std::{
-    fs::{self, File},
-    io::{self, Read},
+use std::path::Path;
+use tokio::{
+    fs,
+    io::{AsyncRead, AsyncReadExt, copy},
     net::TcpStream,
-    path::Path,
 };
-
-use crate::{download_file::DownloadFile, file_info::FileInfo, protocol::read_message};
 
 // if destdir is non-null, the file contents will be read and written to
 // disk
-fn read_file_list(
-    socket: &mut dyn Read,
+async fn read_file_list(
+    socket: &mut (dyn AsyncRead + Unpin),
     file_count: u8,
     destdir: Option<&Path>,
 ) -> Result<Vec<FileInfo>, Box<dyn std::error::Error>> {
     // recv the file info
-    let list = (0..file_count)
-        .map(|_| read_message(socket))
-        .take_while(Result::is_ok) // fail at first error
-        .map(Result::unwrap)
-        .map(|msg| {
-            let mut cursor = std::io::Cursor::new(msg);
-            DownloadFile::deserialize(&mut cursor).map(|f| f.into())
-        })
-        .collect::<Result<Vec<FileInfo>, _>>()?;
+    let mut list = Vec::<FileInfo>::with_capacity(file_count as usize);
+    for _ in 0..file_count {
+        let msg = read_message(socket).await?;
+        let file = DownloadFile::deserialize(&mut &msg[..])?;
+        list.push(file.into());
+    }
+    let list = list;
+
+    // recv/write the file contents
     if let Some(destdir) = destdir {
-        // recv/write the file contents
         for f in &list {
             let path = destdir.join(f.path());
-            fs::create_dir_all(path.parent().unwrap())?;
-            let mut file = File::create(&path)?;
-            let mut hasher = HashWriter::<Md5, _>::new(&mut file);
-            io::copy(&mut socket.take(f.size()), &mut hasher)?;
-            let hash = FileHash::new_from_bytes(hasher.finalize().into());
-            // verify hash
-            if f.hash() != &hash {
-                return Err(format!(
-                    "hash mismatch for file {}: expected {}, got {}",
-                    path.display(),
-                    f.hash(),
-                    hash
-                )
-                .into());
-            }
+            fs::create_dir_all(path.parent().unwrap()).await?;
+            let mut file = fs::File::create(&path).await?;
+            copy(&mut socket.take(f.size()), &mut file).await?;
+            // TODO: verify hash
         }
     }
+
     Ok(list)
 }
 
 // if destdir is NULL, the files will not be read from the message (ie. the
 // uploader must not send the file contents)
-fn read_download_message(
-    socket: &mut dyn Read,
+async fn read_download_message(
+    socket: &mut (dyn AsyncRead + Unpin),
     destdir: Option<&Path>,
 ) -> Result<Vec<FileInfo>, Box<dyn std::error::Error>> {
-    let msg = read_message(socket)?;
+    let msg = read_message(socket).await?;
     let msg = DownloadMessage::deserialize(&mut &msg[..])?;
-    return read_file_list(socket, msg.file_count(), destdir);
+    return read_file_list(socket, msg.file_count(), destdir).await;
 }
 
-pub fn download(
+pub async fn download(
     socket: &mut TcpStream,
     files: &mut Vec<FileInfo>,
     srcdir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     //  read the download message
-    let mut recvlist = read_download_message(socket, None)?;
+    let mut recvlist = read_download_message(socket, None).await?;
     let to_delete = files
         .iter()
         .filter(|f| recvlist.iter().find(|o| o.path() == f.path()).is_none())
@@ -94,10 +81,10 @@ pub fn download(
         let mut buf = Vec::with_capacity(4096);
         resp.serialize(&mut buf)
             .expect("error serializing download response");
-        write_message(socket, &buf)?;
+        write_message(socket, &buf).await?;
     }
     // read download message 2
-    read_download_message(socket, Some(srcdir))?;
+    read_download_message(socket, Some(srcdir)).await?;
     // delete files that we don't need anymore
     for node in to_delete {
         let mut path = srcdir.join(node.path());

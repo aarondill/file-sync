@@ -1,12 +1,5 @@
-use std::{
-    ffi::OsString,
-    fs::File,
-    io,
-    net::{SocketAddr, TcpStream},
-    path::Path,
-    process::ExitCode,
-    str::FromStr,
-};
+// gethostname is not stable yet, i could use a crate, but i'd rather use the nightly feature
+#![feature(gethostname)]
 
 use lib::{
     client_connect::{self, ClientConnect},
@@ -15,6 +8,8 @@ use lib::{
     serial::Serialize,
     variable_length_string::VariableLengthString,
 };
+use std::{path::Path, process::ExitCode};
+use tokio::net::TcpStream;
 
 // Initialize a client connect message
 fn init_connect_msg(upload: bool) -> ClientConnect {
@@ -50,7 +45,8 @@ fn parse_args(iter: impl Iterator<Item = String>) -> (Vec<String>, Vec<String>) 
     (positional, opts)
 }
 
-fn main() -> ExitCode {
+#[tokio::main]
+async fn main() -> ExitCode {
     let mut global_list = Vec::<FileInfo>::new();
     // TODO: ctrl-c
     // std::atomic_flag stop = false;
@@ -82,7 +78,9 @@ fn main() -> ExitCode {
         .rsplit_once(":")
         .map(|(host, port)| (host, port.parse().unwrap()))
         .unwrap_or((server, 8080));
-    let mut connection = TcpStream::connect(addr).expect("error connecting to server");
+    let mut connection = TcpStream::connect(addr)
+        .await
+        .expect("error connecting to server");
 
     // send connect message
     {

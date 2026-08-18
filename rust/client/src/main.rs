@@ -1,24 +1,21 @@
 // gethostname is not stable yet, i could use a crate, but i'd rather use the nightly feature
 #![feature(gethostname)]
 
-use lib::{
-    client_connect::{self, ClientConnect},
-    file_info::FileInfo,
-    protocol::write_message,
-    serial::Serialize,
-    variable_length_string::VariableLengthString,
-};
-use std::{path::Path, process::ExitCode};
+use std::path::Path;
+use std::process::ExitCode;
+
+use lib::client_connect::{self, ClientConnect};
+use lib::file_info::FileInfo;
+use lib::protocol::write_message;
+use lib::serial::Serialize;
+use lib::variable_length_string::VariableLengthString;
 use tokio::net::TcpStream;
 
 // Initialize a client connect message
 fn init_connect_msg(upload: bool) -> ClientConnect {
     let name = std::net::hostname().unwrap_or_else(|_| "unknown".into());
-    let flags = if upload {
-        client_connect::Flags::IntentToUpload
-    } else {
-        client_connect::Flags::empty()
-    };
+    let flags =
+        if upload { client_connect::Flags::IntentToUpload } else { client_connect::Flags::empty() };
     let name = VariableLengthString::new_truncate(name.to_string_lossy().as_bytes());
     ClientConnect::new(flags, name)
 }
@@ -59,11 +56,7 @@ async fn main() -> ExitCode {
     }
     let server = &args[1];
     let directory = Path::new(&args[2]);
-    if !directory.is_dir()
-        || directory
-            .metadata()
-            .map_or(true, |m| m.permissions().readonly())
-    {
+    if !directory.is_dir() || directory.metadata().map_or(true, |m| m.permissions().readonly()) {
         eprintln!("directory is not readable or writable");
         return ExitCode::from(2);
     }
@@ -78,16 +71,13 @@ async fn main() -> ExitCode {
         .rsplit_once(":")
         .map(|(host, port)| (host, port.parse().unwrap()))
         .unwrap_or((server, 8080));
-    let mut connection = TcpStream::connect(addr)
-        .await
-        .expect("error connecting to server");
+    let mut connection = TcpStream::connect(addr).await.expect("error connecting to server");
 
     // send connect message
     {
         let msg = init_connect_msg(should_upload);
         let mut buf = Vec::with_capacity(4096);
-        msg.serialize(&mut buf)
-            .expect("error serializing client connect message");
+        msg.serialize(&mut buf).expect("error serializing client connect message");
         write_message(&mut connection, &buf).expect("error writing connect message");
     }
 

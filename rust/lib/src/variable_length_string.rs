@@ -1,5 +1,6 @@
-use crate::serial::{Deserialize, Serialize};
 use std::io::{Read, Write};
+
+use crate::serial::{Deserialize, Serialize};
 
 /// A variable length string stored on the stack as a length byte followed by the bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,22 +13,27 @@ impl VariableLengthString {
     pub fn from_bytes(length: u8, value: [u8; 255]) -> Self {
         Self { length, value }
     }
+
     pub fn new(value: &[u8]) -> Result<Self, std::num::TryFromIntError> {
         u8::try_from(value.len())?;
         Ok(Self::new_truncate(value))
     }
+
     pub fn new_truncate(value: &[u8]) -> Self {
         let length = value.len().min(255).try_into().expect("impossible");
         let mut value_bytes = [0u8; 255];
         value_bytes[..length as usize].copy_from_slice(value);
         Self::from_bytes(length, value_bytes)
     }
+
     pub fn len(self: &Self) -> u8 {
         return self.length;
     }
+
     pub fn slice(self: &Self) -> &[u8] {
         return &self.value[..self.length as usize];
     }
+
     pub fn to_string(self: &Self) -> String {
         return String::from_utf8_lossy(&self.value[..self.length as usize]).to_string();
     }
@@ -35,12 +41,14 @@ impl VariableLengthString {
 
 impl std::convert::TryFrom<&[u8]> for VariableLengthString {
     type Error = std::num::TryFromIntError;
+
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::new(value)
     }
 }
 impl std::convert::TryFrom<&str> for VariableLengthString {
     type Error = std::num::TryFromIntError;
+
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::new(value.as_bytes())
     }

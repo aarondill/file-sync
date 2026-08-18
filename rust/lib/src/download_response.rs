@@ -1,10 +1,9 @@
-use bitflags::bitflags;
-use std::{io::Read, io::Write};
+use std::io::{Read, Write};
 
-use crate::{
-    file_hash::FileHash,
-    serial::{Deserialize, Serialize},
-};
+use bitflags::bitflags;
+
+use crate::file_hash::FileHash;
+use crate::serial::{Deserialize, Serialize};
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,9 +22,11 @@ impl DownloadResponse {
     pub fn flags(&self) -> &Flags {
         &self.flags
     }
+
     pub fn into_files(self) -> Vec<FileHash> {
         self.files
     }
+
     pub fn new(flags: Flags, files: Vec<FileHash>) -> Self {
         assert!(!flags.contains(Flags::isError));
         u8::try_from(files.len()).expect("too many files");

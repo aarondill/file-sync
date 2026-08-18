@@ -1,7 +1,5 @@
-use std::{
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
@@ -30,6 +28,7 @@ impl FileInfo {
     pub fn new(path: PathBuf, hash: FileHash, size: u64) -> FileInfo {
         FileInfo { path, hash, size }
     }
+
     pub fn new_relative(
         path: PathBuf,
         base: &Path,
@@ -42,6 +41,7 @@ impl FileInfo {
         let path = abs_path.strip_prefix(base)?.to_path_buf();
         Ok(FileInfo { path, hash, size })
     }
+
     pub fn read_list(dir: &Path) -> impl Iterator<Item = FileInfo> {
         WalkDir::new(dir)
             .sort_by_file_name()
@@ -62,9 +62,12 @@ impl FileInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::{fs::File, io::Write};
+    use std::fs::File;
+    use std::io::Write;
+
     use tempdir::TempDir;
+
+    use super::*;
 
     fn setup() -> TempDir {
         let tmpdir = TempDir::new("test_file_info").unwrap();
@@ -91,11 +94,8 @@ mod tests {
         let info = FileInfo::new_relative("test.txt".into(), base.path()).expect("new_relative");
 
         let full_path = base.path().join("test.txt");
-        let expected = FileInfo::new(
-            full_path,
-            "5eb63bbbe01eeed093cb22bb8f5acdc3".parse().unwrap(),
-            11,
-        );
+        let expected =
+            FileInfo::new(full_path, "5eb63bbbe01eeed093cb22bb8f5acdc3".parse().unwrap(), 11);
         assert_eq!(info, expected);
 
         base.close().unwrap();

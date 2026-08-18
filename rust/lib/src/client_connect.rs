@@ -1,10 +1,9 @@
-use bitflags::bitflags;
-use std::{io::Read, io::Write};
+use std::io::{Read, Write};
 
-use crate::{
-    serial::{Deserialize, Serialize},
-    variable_length_string::VariableLengthString,
-};
+use bitflags::bitflags;
+
+use crate::serial::{Deserialize, Serialize};
+use crate::variable_length_string::VariableLengthString;
 const PROTOCOL_VERSION: u8 = 2;
 
 bitflags! {
@@ -23,11 +22,7 @@ pub struct ClientConnect {
 
 impl ClientConnect {
     pub fn new(flags: Flags, client_name: VariableLengthString) -> Self {
-        Self {
-            protocol_version: PROTOCOL_VERSION,
-            flags,
-            client_name,
-        }
+        Self { protocol_version: PROTOCOL_VERSION, flags, client_name }
     }
 }
 
@@ -51,11 +46,7 @@ impl Deserialize for ClientConnect {
 
         let client_name = VariableLengthString::deserialize(reader)?;
 
-        Ok(Self {
-            protocol_version,
-            flags,
-            client_name,
-        })
+        Ok(Self { protocol_version, flags, client_name })
     }
 }
 

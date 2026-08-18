@@ -1,6 +1,7 @@
-use crate::serial::{Deserialize, Serialize};
 use digest_io::IoWrapper;
 use md5::{Digest, Md5};
+
+use crate::serial::{Deserialize, Serialize};
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct FileHash([u8; 16]);
@@ -8,6 +9,7 @@ impl FileHash {
     pub fn new_from_bytes(hash: [u8; 16]) -> Self {
         Self(hash)
     }
+
     pub fn from_hex(hex: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let mut hash = [0; 16];
         if hex.len() != 32 {
@@ -18,11 +20,13 @@ impl FileHash {
         }
         Ok(Self(hash))
     }
+
     pub fn new(f: &mut dyn std::io::Read) -> Result<Self, Box<dyn std::error::Error>> {
         let mut hasher = IoWrapper(Md5::new());
         std::io::copy(f, &mut hasher)?;
         Ok(Self(hasher.0.finalize().into()))
     }
+
     pub fn hex(&self) -> String {
         let mut s = String::new();
         for b in &self.0 {
@@ -33,6 +37,7 @@ impl FileHash {
 }
 impl std::str::FromStr for FileHash {
     type Err = Box<dyn std::error::Error>;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_hex(s)
     }

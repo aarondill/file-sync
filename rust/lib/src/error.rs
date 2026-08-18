@@ -1,10 +1,9 @@
-use bitflags::bitflags;
-use std::{io::Read, io::Write};
+use std::io::{Read, Write};
 
-use crate::{
-    serial::{Deserialize, Serialize},
-    variable_length_string::VariableLengthString,
-};
+use bitflags::bitflags;
+
+use crate::serial::{Deserialize, Serialize};
+use crate::variable_length_string::VariableLengthString;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,11 +23,7 @@ pub struct ProtocolError {
 impl ProtocolError {
     pub fn new(flags: Flags, code: u8, message: VariableLengthString) -> Self {
         assert!(flags.contains(Flags::isError));
-        Self {
-            flags,
-            code,
-            message,
-        }
+        Self { flags, code, message }
     }
 }
 
@@ -48,11 +43,7 @@ impl Deserialize for ProtocolError {
         }
         let code = u8::deserialize(reader)?;
         let message = VariableLengthString::deserialize(reader)?;
-        Ok(Self {
-            flags,
-            code,
-            message,
-        })
+        Ok(Self { flags, code, message })
     }
 }
 

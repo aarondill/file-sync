@@ -1,18 +1,16 @@
-use crate::{
-    download_file::DownloadFile,
-    download_message::DownloadMessage,
-    download_response::{self, DownloadResponse},
-    file_hash::FileHash,
-    file_info::FileInfo,
-    protocol::{read_message, write_message},
-    serial::{Deserialize, Serialize},
-};
 use std::path::Path;
-use tokio::{
-    fs,
-    io::{AsyncRead, AsyncReadExt, copy},
-    net::TcpStream,
-};
+
+use tokio::fs;
+use tokio::io::{AsyncRead, AsyncReadExt, copy};
+use tokio::net::TcpStream;
+
+use crate::download_file::DownloadFile;
+use crate::download_message::DownloadMessage;
+use crate::download_response::{self, DownloadResponse};
+use crate::file_hash::FileHash;
+use crate::file_info::FileInfo;
+use crate::protocol::{read_message, write_message};
+use crate::serial::{Deserialize, Serialize};
 
 // if destdir is non-null, the file contents will be read and written to
 // disk
@@ -67,20 +65,15 @@ pub async fn download(
         .filter(|f| recvlist.iter().find(|o| o.path() == f.path()).is_none())
         .collect::<Vec<_>>();
     // filter the recv list to exclude anything that we already have; keep only the files that we need
-    recvlist.retain(|f| {
-        files
-            .iter()
-            .find(|o| o.path() == f.path() && o.hash() == f.hash())
-            .is_none()
-    });
+    recvlist
+        .retain(|f| files.iter().find(|o| o.path() == f.path() && o.hash() == f.hash()).is_none());
     {
         // send download response
         assert!(recvlist.len() <= 255); // this is a protocol limit
         let hashes: Vec<FileHash> = recvlist.iter().map(|f| f.hash()).cloned().collect();
         let resp = DownloadResponse::new(download_response::Flags::empty(), hashes);
         let mut buf = Vec::with_capacity(4096);
-        resp.serialize(&mut buf)
-            .expect("error serializing download response");
+        resp.serialize(&mut buf).expect("error serializing download response");
         write_message(socket, &buf).await?;
     }
     // read download message 2

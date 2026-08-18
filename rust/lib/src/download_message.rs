@@ -1,6 +1,8 @@
-use crate::serial::{Deserialize, Serialize};
-use bitflags::bitflags;
 use std::io::{Read, Write};
+
+use bitflags::bitflags;
+
+use crate::serial::{Deserialize, Serialize};
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,9 +46,11 @@ impl DownloadMessage {
     pub fn flags(&self) -> &Flags {
         &self.flags
     }
+
     pub fn file_count(&self) -> u8 {
         self.file_count
     }
+
     pub fn new(flags: Flags, file_count: u8) -> Self {
         assert!(!flags.contains(Flags::isError));
         Self { flags, file_count }
@@ -77,9 +81,7 @@ mod tests {
     #[test]
     fn serialize_works() {
         let mut buffer = Vec::new();
-        DownloadMessage::new(Flags::empty(), 1)
-            .serialize(&mut buffer)
-            .unwrap();
+        DownloadMessage::new(Flags::empty(), 1).serialize(&mut buffer).unwrap();
         assert_eq!(buffer, [0, 1]);
     }
     #[test]

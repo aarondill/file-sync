@@ -1,8 +1,9 @@
+use std::io::{Read, Write};
+
 use crate::file_hash::FileHash;
 use crate::file_info::FileInfo;
 use crate::serial::{Deserialize, Serialize};
 use crate::variable_length_string::VariableLengthString;
-use std::{io::Read, io::Write};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DownloadFile {
@@ -41,11 +42,7 @@ impl std::convert::From<&FileInfo> for DownloadFile {
         Self::new(
             info.hash().clone(),
             info.size().try_into().expect("size too large"),
-            info.path()
-                .to_string_lossy()
-                .as_bytes()
-                .try_into()
-                .expect("name too long"),
+            info.path().to_string_lossy().as_bytes().try_into().expect("name too long"),
         )
     }
 }
@@ -72,11 +69,8 @@ mod tests {
     use super::*;
     #[test]
     fn serialize_works() {
-        let file = DownloadFile::new(
-            FileHash::new_from_bytes([0; 16]),
-            64,
-            "test".try_into().unwrap(),
-        );
+        let file =
+            DownloadFile::new(FileHash::new_from_bytes([0; 16]), 64, "test".try_into().unwrap());
         let mut buffer = Vec::new();
         file.serialize(&mut buffer).unwrap();
         let expected = [
@@ -94,11 +88,8 @@ mod tests {
             4, b't', b'e', b's', b't',
         ];
         let file = DownloadFile::deserialize(&mut bytes.as_slice()).unwrap();
-        let expected = DownloadFile::new(
-            FileHash::new_from_bytes([0; 16]),
-            64,
-            "test".try_into().unwrap(),
-        );
+        let expected =
+            DownloadFile::new(FileHash::new_from_bytes([0; 16]), 64, "test".try_into().unwrap());
         assert_eq!(file, expected);
     }
     #[test]

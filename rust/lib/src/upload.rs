@@ -41,7 +41,7 @@ fn write_download_message<T: Borrow<FileInfo>>(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let msg = DownloadMessage::new(
         download_message::Flags::empty(),
-        list.iter().map(|f| f.borrow().into()).collect(),
+        list.len().try_into().expect("too many files"),
     );
     let mut buf = Vec::with_capacity(4096);
     msg.serialize(&mut buf)

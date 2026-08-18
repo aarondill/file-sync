@@ -1,5 +1,3 @@
-use std::borrow::{Borrow, BorrowMut};
-
 use crate::serial::{Deserialize, Serialize};
 use digest_io::IoWrapper;
 use md5::{Digest, Md5};

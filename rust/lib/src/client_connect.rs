@@ -9,7 +9,7 @@ const PROTOCOL_VERSION: u8 = 2;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub struct ClientConnectFlags: u8 {
+    pub struct Flags: u8 {
         const IntentToUpload = 0b00000001;
         const _ = !0; // any other bits are reserved for future use
     }
@@ -17,12 +17,12 @@ bitflags! {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClientConnect {
     protocol_version: u8,
-    flags: ClientConnectFlags,
+    flags: Flags,
     client_name: VariableLengthString,
 }
 
 impl ClientConnect {
-    pub fn new(flags: ClientConnectFlags, client_name: VariableLengthString) -> Self {
+    pub fn new(flags: Flags, client_name: VariableLengthString) -> Self {
         Self {
             protocol_version: PROTOCOL_VERSION,
             flags,
@@ -47,7 +47,7 @@ impl Deserialize for ClientConnect {
         }
 
         let flags = u8::deserialize(reader)?;
-        let flags = ClientConnectFlags::from_bits(flags).expect("invalid flags");
+        let flags = Flags::from_bits(flags).expect("invalid flags");
 
         let client_name = VariableLengthString::deserialize(reader)?;
 
@@ -64,10 +64,7 @@ mod tests {
     use super::*;
     #[test]
     fn serialize_works() {
-        let test = ClientConnect::new(
-            ClientConnectFlags::IntentToUpload,
-            "test".try_into().unwrap(),
-        );
+        let test = ClientConnect::new(Flags::IntentToUpload, "test".try_into().unwrap());
         let mut bytes = Vec::<u8>::new();
         test.serialize(&mut bytes).expect("failed to serialize");
 
@@ -79,16 +76,13 @@ mod tests {
         let bytes = [PROTOCOL_VERSION, 0b00000001, 4, b't', b'e', b's', b't'];
         let res = ClientConnect::deserialize(&mut &bytes[..]).expect("failed to serialize");
 
-        let expected = ClientConnect::new(
-            ClientConnectFlags::IntentToUpload,
-            "test".try_into().unwrap(),
-        );
+        let expected = ClientConnect::new(Flags::IntentToUpload, "test".try_into().unwrap());
         assert_eq!(res, expected);
     }
     #[test]
     fn it_works() {
         let name = "this is a test of the client connect protocol";
-        let test = ClientConnect::new(ClientConnectFlags::empty(), name.try_into().unwrap());
+        let test = ClientConnect::new(Flags::empty(), name.try_into().unwrap());
         let mut bytes = Vec::<u8>::new();
         test.serialize(&mut bytes).expect("failed to serialize");
 

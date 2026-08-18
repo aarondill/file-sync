@@ -13,13 +13,14 @@ impl VariableLengthString {
         Self { length, value }
     }
     pub fn new(value: &[u8]) -> Result<Self, std::num::TryFromIntError> {
-        let length: u8 = value.len().try_into()?;
+        u8::try_from(value.len())?;
+        Ok(Self::new_truncate(value))
+    }
+    pub fn new_truncate(value: &[u8]) -> Self {
+        let length = value.len().min(255).try_into().expect("impossible");
         let mut value_bytes = [0u8; 255];
         value_bytes[..length as usize].copy_from_slice(value);
-        Ok(Self {
-            length,
-            value: value_bytes,
-        })
+        Self::from_bytes(length, value_bytes)
     }
     pub fn len(self: &Self) -> u8 {
         return self.length;

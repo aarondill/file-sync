@@ -42,13 +42,13 @@ impl FileInfo {
         let path = abs_path.strip_prefix(base)?.to_path_buf();
         Ok(FileInfo { path, hash, size })
     }
-    pub fn read_list(dir: &Path) -> Vec<FileInfo> {
+    pub fn read_list(dir: &Path) -> impl Iterator<Item = FileInfo> {
         WalkDir::new(dir)
             .sort_by_file_name()
             .into_iter()
             .filter_map(|e| e.ok()) // ignore errors
             .filter(|e| !e.file_type().is_dir())
-            .map(|entry| {
+            .map(move |entry| {
                 let path = entry.path();
                 let size = path.metadata().unwrap().len();
                 let mut file = File::open(path).unwrap();
@@ -57,7 +57,6 @@ impl FileInfo {
                 let path = path.strip_prefix(dir).unwrap().to_path_buf();
                 FileInfo { path, hash, size }
             })
-            .collect::<Vec<FileInfo>>()
     }
 }
 
@@ -111,7 +110,7 @@ mod tests {
     #[test]
     fn test_read_list() {
         let base = setup();
-        let infos = FileInfo::read_list(base.path());
+        let infos: Vec<_> = FileInfo::read_list(base.path()).collect();
         let expected = vec![
             FileInfo::new(
                 "test.txt".into(),

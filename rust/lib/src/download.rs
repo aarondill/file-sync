@@ -103,9 +103,9 @@ pub fn download(
         let mut path = srcdir.join(node.path());
         println!("deleting {}", path.display());
         // remove the file and parent directories
-        std::fs::remove_file(path)?;
+        std::fs::remove_file(&path)?;
         while path.pop() && path != Path::new("") {
-            match std::fs::remove_dir(path) {
+            match std::fs::remove_dir(&path) {
                 Ok(_) => break,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => break,
                 Err(e) if e.kind() == std::io::ErrorKind::DirectoryNotEmpty => break,

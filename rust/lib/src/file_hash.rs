@@ -8,6 +8,16 @@ impl FileHash {
     pub fn new_from_bytes(hash: [u8; 16]) -> Self {
         Self(hash)
     }
+    pub fn from_hex(hex: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut hash = [0; 16];
+        if hex.len() != 32 {
+            return Err("invalid hex length".into());
+        }
+        for (i, c) in hex.as_bytes().chunks(2).enumerate() {
+            hash[i] = u8::from_str_radix(std::str::from_utf8(c)?, 16)?;
+        }
+        Ok(Self(hash))
+    }
     pub fn new(f: &mut dyn std::io::Read) -> Result<Self, Box<dyn std::error::Error>> {
         let mut hasher = IoWrapper(Md5::new());
         std::io::copy(f, &mut hasher)?;
@@ -19,6 +29,12 @@ impl FileHash {
             s.push_str(&format!("{:02x}", b));
         }
         s
+    }
+}
+impl std::str::FromStr for FileHash {
+    type Err = Box<dyn std::error::Error>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_hex(s)
     }
 }
 impl std::fmt::Display for FileHash {
@@ -51,7 +67,6 @@ impl Deserialize for FileHash {
 
 #[cfg(test)]
 mod tests {
-
     use std::io::Cursor;
 
     use super::*;
@@ -80,5 +95,10 @@ mod tests {
         ];
         let fh = FileHash::deserialize(&mut &bytes[..]).unwrap();
         assert_eq!(fh.0, bytes);
+    }
+    #[test]
+    fn test_from_hex() {
+        let fh = FileHash::from_hex("5eb63bbbe01eeed093cb22bb8f5acdc3").unwrap();
+        assert_eq!(fh.hex(), "5eb63bbbe01eeed093cb22bb8f5acdc3");
     }
 }

@@ -16,3 +16,21 @@ pub fn write_message(
     writer.write_all(message)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_read_message() {
+        let data = vec![4, 0x04, 0x03, 0x02, 0x01];
+        let msg = read_message(&mut &data[..]).unwrap();
+        assert_eq!(msg, vec![0x04, 0x03, 0x02, 0x01]);
+    }
+    #[test]
+    fn test_write_message() {
+        let data = vec![0x04, 0x03, 0x02, 0x01];
+        let mut buf = Vec::new();
+        write_message(&mut buf, &data).unwrap();
+        assert_eq!(buf, vec![4, 0x03, 0x02, 0x01]);
+    }
+}

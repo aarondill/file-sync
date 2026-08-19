@@ -91,9 +91,14 @@ mod tests {
         let data = 128;
         let mut buf = Vec::new();
         data.serialize(&mut buf).unwrap();
-        assert_eq!(buf, vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80]);
-        let mut cursor = std::io::Cursor::new(buf);
-        let data2 = u128::deserialize(&mut cursor).unwrap();
+        assert_eq!(
+            buf,
+            vec![
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x80
+            ]
+        );
+        let data2 = u128::deserialize(&mut &buf[..]).unwrap();
         assert_eq!(data, data2);
     }
     #[test]
@@ -101,9 +106,8 @@ mod tests {
         let data = 64;
         let mut buf = Vec::new();
         data.serialize(&mut buf).unwrap();
-        assert_eq!(buf, vec![0x00, 0x00, 0x00, 0x40]);
-        let mut cursor = std::io::Cursor::new(buf);
-        let data2 = u64::deserialize(&mut cursor).unwrap();
+        assert_eq!(buf, vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40]);
+        let data2 = u64::deserialize(&mut &buf[..]).unwrap();
         assert_eq!(data, data2);
     }
     #[test]
@@ -111,9 +115,8 @@ mod tests {
         let data = 32;
         let mut buf = Vec::new();
         data.serialize(&mut buf).unwrap();
-        assert_eq!(buf, vec![0x00, 0x20]);
-        let mut cursor = std::io::Cursor::new(buf);
-        let data2 = u32::deserialize(&mut cursor).unwrap();
+        assert_eq!(buf, vec![0x00, 0x00, 0x00, 0x20]);
+        let data2 = u32::deserialize(&mut &buf[..]).unwrap();
         assert_eq!(data, data2);
     }
     #[test]
@@ -121,9 +124,8 @@ mod tests {
         let data = 16;
         let mut buf = Vec::new();
         data.serialize(&mut buf).unwrap();
-        assert_eq!(buf, vec![0x10]);
-        let mut cursor = std::io::Cursor::new(buf);
-        let data2 = u16::deserialize(&mut cursor).unwrap();
+        assert_eq!(buf, vec![0x00, 0x10]);
+        let data2 = u16::deserialize(&mut &buf[..]).unwrap();
         assert_eq!(data, data2);
     }
     #[test]
@@ -132,15 +134,13 @@ mod tests {
         let mut buf = Vec::new();
         data.serialize(&mut buf).unwrap();
         assert_eq!(buf, vec![0x08]);
-        let mut cursor = std::io::Cursor::new(buf);
-        let data2 = u8::deserialize(&mut cursor).unwrap();
+        let data2 = u8::deserialize(&mut &buf[..]).unwrap();
         assert_eq!(data, data2);
     }
     #[test]
     fn test_u16_fail() {
         let buf = vec![0x10];
-        let mut cursor = std::io::Cursor::new(buf);
-        let data2 = u8::deserialize(&mut cursor);
+        let data2 = u16::deserialize(&mut &buf[..]);
         assert!(data2.is_err());
     }
 }

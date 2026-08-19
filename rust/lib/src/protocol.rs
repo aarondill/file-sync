@@ -23,7 +23,7 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn test_read_message() {
-        let data = vec![4, 0x04, 0x03, 0x02, 0x01];
+        let data = vec![0x00, 0x04, 0x04, 0x03, 0x02, 0x01];
         let msg = read_message(&mut &data[..]).await.unwrap();
         assert_eq!(msg, vec![0x04, 0x03, 0x02, 0x01]);
     }
@@ -32,6 +32,6 @@ mod tests {
         let data = vec![0x04, 0x03, 0x02, 0x01];
         let mut buf = Vec::new();
         write_message(&mut buf, &data).await.unwrap();
-        assert_eq!(buf, vec![4, 0x03, 0x02, 0x01]);
+        assert_eq!(buf, vec![0x0, 0x4, 0x04, 0x03, 0x02, 0x01]);
     }
 }

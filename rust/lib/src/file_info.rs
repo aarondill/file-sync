@@ -1,6 +1,7 @@
-use std::fs::File;
 use std::path::{Path, PathBuf};
 
+use futures::{Stream, StreamExt};
+use tokio::fs;
 use walkdir::WalkDir;
 
 use crate::file_hash::FileHash;
@@ -29,34 +30,31 @@ impl FileInfo {
         FileInfo { path, hash, size }
     }
 
-    pub fn new_relative(
+    pub async fn new_relative(
         path: PathBuf,
         base: &Path,
     ) -> Result<FileInfo, Box<dyn std::error::Error>> {
-        let abs_path = base.join(path);
-        let size = abs_path.metadata()?.len();
-        let mut file = File::open(&abs_path)?;
-        let hash = FileHash::new(&mut file)?;
-
-        let path = abs_path.strip_prefix(base)?.to_path_buf();
+        let path = path.strip_prefix(base).unwrap_or(&path).to_path_buf();
+        // path must be relative or a subpath of base
+        if !path.is_relative() {
+            return Err("path is not relative".into());
+        }
+        let abs_path = base.join(&path);
+        let size = fs::metadata(&abs_path).await?.len();
+        let mut file = fs::File::open(&abs_path).await?;
+        let hash = FileHash::new(&mut file).await?;
         Ok(FileInfo { path, hash, size })
     }
 
-    pub fn read_list(dir: &Path) -> impl Iterator<Item = FileInfo> {
-        WalkDir::new(dir)
+    pub fn read_list(dir: &Path) -> impl Stream<Item = FileInfo> {
+        let iter = WalkDir::new(dir)
             .sort_by_file_name()
             .into_iter()
-            .filter_map(|e| e.ok()) // ignore errors
-            .filter(|e| !e.file_type().is_dir())
-            .map(move |entry| {
-                let path = entry.path();
-                let size = path.metadata().unwrap().len();
-                let mut file = File::open(path).unwrap();
-                let hash = FileHash::new(&mut file).unwrap();
-
-                let path = path.strip_prefix(dir).unwrap().to_path_buf();
-                FileInfo { path, hash, size }
-            })
+            .filter_map(Result::ok) // ignore errors
+            .filter(|e| !e.file_type().is_dir());
+        futures::stream::iter(iter)
+            .then(async move |entry| FileInfo::new_relative(entry.path().to_path_buf(), dir).await)
+            .map(Result::unwrap) // they're all relative already
     }
 }
 
@@ -65,6 +63,7 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
 
+    use futures::StreamExt;
     use tempdir::TempDir;
 
     use super::*;
@@ -87,11 +86,12 @@ mod tests {
         tmpdir
     }
 
-    #[test]
-    fn test_new_relative() {
+    #[tokio::test]
+    async fn test_new_relative() {
         let base = setup();
 
-        let info = FileInfo::new_relative("test.txt".into(), base.path()).expect("new_relative");
+        let info =
+            FileInfo::new_relative("test.txt".into(), base.path()).await.expect("new_relative");
 
         let full_path = base.path().join("test.txt");
         let expected =
@@ -100,17 +100,17 @@ mod tests {
 
         base.close().unwrap();
     }
-    #[test]
-    fn test_new_relative_fail() {
+    #[tokio::test]
+    async fn test_new_relative_fail() {
         let base = setup();
-        let info = FileInfo::new_relative("../parent-path/test.txt".into(), base.path());
+        let info = FileInfo::new_relative("../parent-path/test.txt".into(), base.path()).await;
         assert!(info.is_err());
         base.close().unwrap();
     }
-    #[test]
-    fn test_read_list() {
+    #[tokio::test]
+    async fn test_read_list() {
         let base = setup();
-        let infos: Vec<_> = FileInfo::read_list(base.path()).collect();
+        let infos: Vec<_> = FileInfo::read_list(base.path()).collect().await;
         let expected = vec![
             FileInfo::new(
                 "test.txt".into(),

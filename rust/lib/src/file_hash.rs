@@ -1,5 +1,5 @@
-use digest_io::IoWrapper;
 use md5::{Digest, Md5};
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::serial::{Deserialize, Serialize};
 
@@ -21,10 +21,17 @@ impl FileHash {
         Ok(Self(hash))
     }
 
-    pub fn new(f: &mut dyn std::io::Read) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut hasher = IoWrapper(Md5::new());
-        std::io::copy(f, &mut hasher)?;
-        Ok(Self(hasher.0.finalize().into()))
+    pub async fn new(f: &mut (dyn AsyncRead + Unpin)) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut hasher = Md5::new();
+        let mut buf = [0; 4096];
+        loop {
+            let size = f.read(&mut buf).await?;
+            if size == 0 {
+                break; // EOF
+            }
+            hasher.update(&buf[..size]);
+        }
+        Ok(Self(hasher.finalize().into()))
     }
 
     pub fn hex(&self) -> String {
@@ -75,10 +82,10 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    #[test]
-    fn test_file_hash() {
+    #[tokio::test]
+    async fn test_file_hash() {
         let data = "hello world".as_bytes().to_vec();
-        let fh = FileHash::new(&mut Cursor::new(data)).unwrap();
+        let fh = FileHash::new(&mut Cursor::new(data)).await.unwrap();
         assert_eq!(fh.hex(), "5eb63bbbe01eeed093cb22bb8f5acdc3")
     }
     #[test]

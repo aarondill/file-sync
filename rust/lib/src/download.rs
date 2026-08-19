@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use tokio::fs;
-use tokio::io::{AsyncRead, AsyncReadExt, copy};
+use tokio::io::{self, AsyncRead, AsyncReadExt};
 use tokio::net::TcpStream;
 
 use crate::download_file::DownloadFile;
@@ -34,7 +34,7 @@ async fn read_file_list(
             let path = destdir.join(f.path());
             fs::create_dir_all(path.parent().unwrap()).await?;
             let mut file = fs::File::create(&path).await?;
-            copy(&mut socket.take(f.size()), &mut file).await?;
+            io::copy(&mut socket.take(f.size()), &mut file).await?;
             // TODO: verify hash
         }
     }
@@ -83,12 +83,12 @@ pub async fn download(
         let mut path = srcdir.join(node.path());
         println!("deleting {}", path.display());
         // remove the file and parent directories
-        std::fs::remove_file(&path)?;
+        fs::remove_file(&path).await?;
         while path.pop() && path != Path::new("") {
-            match std::fs::remove_dir(&path) {
+            match fs::remove_dir(&path).await {
                 Ok(_) => break,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => break,
-                Err(e) if e.kind() == std::io::ErrorKind::DirectoryNotEmpty => break,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => break,
+                Err(e) if e.kind() == io::ErrorKind::DirectoryNotEmpty => break,
                 Err(e) => return Err(e.into()),
             }
         }

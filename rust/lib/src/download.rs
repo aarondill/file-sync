@@ -55,7 +55,7 @@ async fn read_download_message(
 
 pub async fn download(
     socket: &mut TcpStream,
-    files: &mut Vec<FileInfo>,
+    files: &Vec<FileInfo>,
     srcdir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     //  read the download message

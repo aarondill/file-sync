@@ -90,12 +90,14 @@ mod tests {
     async fn test_new_relative() {
         let base = setup();
 
-        let info =
-            FileInfo::new_relative("test.txt".into(), base.path()).await.expect("new_relative");
-
         let full_path = base.path().join("test.txt");
-        let expected =
-            FileInfo::new(full_path, "5eb63bbbe01eeed093cb22bb8f5acdc3".parse().unwrap(), 11);
+        let info = FileInfo::new_relative(full_path, base.path()).await.expect("new_relative");
+
+        let expected = FileInfo::new(
+            "test.txt".into(),
+            "5eb63bbbe01eeed093cb22bb8f5acdc3".parse().unwrap(),
+            11,
+        );
         assert_eq!(info, expected);
 
         base.close().unwrap();
@@ -113,14 +115,14 @@ mod tests {
         let infos: Vec<_> = FileInfo::read_list(base.path()).collect().await;
         let expected = vec![
             FileInfo::new(
-                "test.txt".into(),
-                "5eb63bbbe01eeed093cb22bb8f5acdc3".parse().unwrap(),
-                11,
-            ),
-            FileInfo::new(
                 "subdir/test2.txt".into(),
                 "0949f7eb1f66dad39d488d5d22531166".parse().unwrap(),
                 13,
+            ),
+            FileInfo::new(
+                "test.txt".into(),
+                "5eb63bbbe01eeed093cb22bb8f5acdc3".parse().unwrap(),
+                11,
             ),
         ];
         assert_eq!(infos, expected);

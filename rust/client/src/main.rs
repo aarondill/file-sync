@@ -1,6 +1,7 @@
 // gethostname is not stable yet, i could use a crate, but i'd rather use the nightly feature
 #![feature(gethostname)]
 
+use std::error::Error;
 use std::io::Read;
 use std::path::Path;
 use std::process::ExitCode;
@@ -55,9 +56,6 @@ fn parse_args(iter: impl Iterator<Item = String>) -> (Vec<String>, Vec<String>) 
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let mut global_list = Vec::<FileInfo>::new();
-    let (tx_stop, rx_stop) = tokio::sync::watch::channel(false);
-
     let (args, opts) = parse_args(std::env::args());
     let should_upload = opts.contains(&"-u".to_string());
     if args.len() != 2 {
@@ -70,6 +68,17 @@ async fn main() -> ExitCode {
         eprintln!("directory is not readable or writable");
         return ExitCode::from(2);
     }
+
+    process(server, directory, should_upload).await.unwrap();
+    ExitCode::SUCCESS
+}
+async fn process(
+    server: &str,
+    directory: &Path,
+    should_upload: bool,
+) -> Result<(), Box<dyn Error>> {
+    let mut global_list = Vec::<FileInfo>::new();
+    let (tx_stop, rx_stop) = tokio::sync::watch::channel(false);
 
     // The server starts by sending an upload to the client unless the client
     // explicitly requests otherwise
@@ -127,15 +136,13 @@ async fn main() -> ExitCode {
             tokio::select! {
                 recv = recv.recv() => { // user input
                     let Some(c) = recv else {
-                        eprintln!("connection closed");
-                        return ExitCode::FAILURE;
+                        return Err("connection closed".into());
                     };
                     SelectState::Command(c)
                 },
                 r = connection.readable() => {
                     if let Err(e) = r {
-                        eprintln!("error reading from connection: {}", e);
-                        return ExitCode::FAILURE;
+                        return Err(format!("error reading from connection: {}", e).into());
                     }
                     SelectState::Downloading
                 }
@@ -145,13 +152,9 @@ async fn main() -> ExitCode {
         match state {
             SelectState::Downloading => {
                 let (read, mut write) = connection.split();
-                let mut read = match check_readable(read) {
-                    Ok(None) => continue, // false positive
-                    Ok(Some(r)) => r,
-                    Err(e) => {
-                        eprintln!("error: {}", e);
-                        return ExitCode::FAILURE;
-                    }
+                let mut read = match check_readable(read)? {
+                    None => continue, // false positive
+                    Some(r) => r,
                 };
                 download(&mut read, &mut write, &global_list, directory)
                     .await
@@ -162,18 +165,9 @@ async fn main() -> ExitCode {
                 let mut buf = [0];
                 match connection.try_read(&mut buf) {
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
-                    Ok(0) => {
-                        eprintln!("connection closed");
-                        return ExitCode::FAILURE;
-                    }
-                    Ok(_) => {
-                        eprintln!("upload pending while connection has data!");
-                        return ExitCode::FAILURE;
-                    }
-                    Err(e) => {
-                        eprintln!("error reading from connection: {}", e);
-                        return ExitCode::FAILURE;
-                    }
+                    Ok(0) => return Err("connection closed".into()),
+                    Ok(_) => return Err("upload pending while connection has data!".into()),
+                    Err(e) => return Err(format!("error reading from connection: {}", e).into()),
                 };
                 update_list(directory, &mut global_list).await; // files may change between downloads
                 let (mut read, mut write) = connection.split();
@@ -195,12 +189,9 @@ async fn main() -> ExitCode {
                     println!();
                     continue;
                 }
-                _ => {
-                    eprintln!("unknown command");
-                    return ExitCode::FAILURE;
-                }
+                _ => return Err("unknown command".into()),
             },
         };
     }
-    return ExitCode::SUCCESS;
+    return Ok(());
 }

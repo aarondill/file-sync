@@ -1,9 +1,6 @@
-// gethostname is not stable yet, i could use a crate, but i'd rather use the nightly feature
-#![feature(gethostname)]
-
 use core::panic;
 use std::error::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -116,14 +113,14 @@ async fn handle_client(
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let mut global_list_lock = Arc::new(RwLock::new(Vec::<FileInfo>::new()));
+    let global_list_lock = Arc::new(RwLock::new(Vec::<FileInfo>::new()));
 
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() > 2 {
         eprintln!("usage: {} <directory> [port]", args[0]);
         return ExitCode::from(2);
     }
-    let directory = Path::new(&args[0]);
+    let directory = PathBuf::from(&args[0]);
     let port = args.get(1).map_or(8080, |s| s.parse().unwrap());
 
     if !directory.is_dir() || directory.metadata().map_or(true, |m| m.permissions().readonly()) {
@@ -134,19 +131,22 @@ async fn main() -> ExitCode {
     {
         // update the list before starting the server
         let mut global_list = global_list_lock.write().await;
-        update_list(directory, &mut global_list).await;
+        update_list(&directory, &mut global_list).await;
     }
 
-    let mut listener =
-        TcpListener::bind(("127.0.0.1", port)).await.expect("error binding to server");
+    let listener = TcpListener::bind(("127.0.0.1", port)).await.expect("error binding to server");
 
-    let mut tasks = TaskTracker::new();
-    let mut token = CancellationToken::new();
-    tokio::spawn(async move {
-        // handle ctrl-c
-        tokio::signal::ctrl_c().await.expect("error handling ctrl-c");
-        token.cancel();
-    });
+    let tasks = TaskTracker::new();
+    let token = CancellationToken::new();
+
+    {
+        let token = token.clone();
+        tokio::spawn(async move {
+            // handle ctrl-c
+            tokio::signal::ctrl_c().await.expect("error handling ctrl-c");
+            token.cancel();
+        });
+    }
 
     // A channel to coordinate uploads
     let (tx, _) = broadcast::channel::<()>(10);
@@ -166,8 +166,9 @@ async fn main() -> ExitCode {
         let global_list_lock = global_list_lock.clone();
         let token = token.clone();
         let tx = tx.clone();
+        let directory = directory.clone();
         let fut = async move {
-            handle_client(socket, directory, global_list_lock, token, tx)
+            let _ = handle_client(socket, &directory, global_list_lock, token, tx)
                 .await
                 .map_err(|e| eprintln!("error handling client: {}", e));
         };

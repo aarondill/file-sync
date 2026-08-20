@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 
 use bitflags::bitflags;
 
+use crate::download_message::MessageDeserializeError;
 use crate::serial::{Deserialize, Serialize};
 use crate::variable_length_string::VariableLengthString;
 
@@ -28,7 +29,9 @@ impl ProtocolError {
 }
 
 impl Serialize for ProtocolError {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         self.flags.bits().serialize(writer)?;
         self.code.serialize(writer)?;
         self.message.serialize(writer)?;
@@ -36,10 +39,13 @@ impl Serialize for ProtocolError {
     }
 }
 impl Deserialize for ProtocolError {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = MessageDeserializeError;
+
+    /// NOTE: returns ErrorFlag if the error is not an error
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let flags = Flags::from_bits(u8::deserialize(reader)?).unwrap();
         if !flags.contains(Flags::isError) {
-            return Err("not an error".into());
+            return Err(MessageDeserializeError::ErrorFlag);
         }
         let code = u8::deserialize(reader)?;
         let message = VariableLengthString::deserialize(reader)?;

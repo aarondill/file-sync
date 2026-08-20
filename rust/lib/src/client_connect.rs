@@ -38,8 +38,18 @@ impl ClientConnect {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+enum SerialError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("protocol version mismatch: got {0}, expected {PROTOCOL_VERSION}")]
+    ProtocolVersionMismatch(u8),
+}
+
 impl Serialize for ClientConnect {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), SerialError> {
         self.protocol_version.serialize(writer)?;
         self.flags.bits().serialize(writer)?;
         self.client_name.serialize(writer)?;
@@ -47,10 +57,12 @@ impl Serialize for ClientConnect {
     }
 }
 impl Deserialize for ClientConnect {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = SerialError;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, SerialError> {
         let protocol_version = u8::deserialize(reader)?;
         if protocol_version != PROTOCOL_VERSION {
-            return Err("protocol version mismatch".into());
+            return Err(SerialError::ProtocolVersionMismatch(protocol_version));
         }
 
         let flags = u8::deserialize(reader)?;

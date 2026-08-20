@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 
 use bitflags::bitflags;
 
+use crate::download_message::MessageDeserializeError;
 use crate::file_hash::FileHash;
 use crate::serial::{Deserialize, Serialize};
 
@@ -35,7 +36,9 @@ impl DownloadResponse {
 }
 
 impl Serialize for DownloadResponse {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         self.flags.bits().serialize(writer)?;
         let len: u8 = self.files.len() as u8;
         len.serialize(writer)?;
@@ -45,11 +48,15 @@ impl Serialize for DownloadResponse {
         Ok(())
     }
 }
+
 impl Deserialize for DownloadResponse {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
-        let flags = Flags::from_bits(u8::deserialize(reader)?).unwrap();
+    type Error = MessageDeserializeError;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
+        let flags = Flags::from_bits(u8::deserialize(reader)?)
+            .ok_or(MessageDeserializeError::InvalidFlags)?;
         if flags.contains(Flags::isError) {
-            return Err("is an error".into());
+            return Err(MessageDeserializeError::ErrorFlag);
         }
         let file_count = u8::deserialize(reader)?;
         let mut files = Vec::with_capacity(file_count as usize);

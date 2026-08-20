@@ -2,6 +2,13 @@ use md5::{Digest, Md5};
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::serial::{Deserialize, Serialize};
+#[derive(Debug, thiserror::Error)]
+pub enum HashParseError {
+    #[error("invalid hex length")]
+    InvalidHexLength,
+    #[error("invalid hex character")]
+    InvalidHexCharacter,
+}
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct FileHash([u8; 16]);
@@ -10,20 +17,20 @@ impl FileHash {
         Self(hash)
     }
 
-    pub fn from_hex(hex: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_hex(hex: &str) -> Result<Self, HashParseError> {
         let mut hash = [0; 16];
         if hex.len() != 32 {
-            return Err("invalid hex length".into());
+            return Err(HashParseError::InvalidHexLength);
         }
         for (i, c) in hex.as_bytes().chunks(2).enumerate() {
-            hash[i] = u8::from_str_radix(std::str::from_utf8(c)?, 16)?;
+            let s = std::str::from_utf8(c).map_err(|_| HashParseError::InvalidHexCharacter)?;
+            let c = u8::from_str_radix(s, 16).map_err(|_| HashParseError::InvalidHexCharacter)?;
+            hash[i] = c;
         }
         Ok(Self(hash))
     }
 
-    pub async fn new(
-        f: &mut (dyn AsyncRead + Unpin + Send),
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(f: &mut (dyn AsyncRead + Unpin + Send)) -> Result<Self, std::io::Error> {
         let mut hasher = Md5::new();
         let mut buf = [0; 4096];
         loop {
@@ -45,7 +52,7 @@ impl FileHash {
     }
 }
 impl std::str::FromStr for FileHash {
-    type Err = Box<dyn std::error::Error>;
+    type Err = HashParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_hex(s)
@@ -63,13 +70,17 @@ impl std::fmt::Debug for FileHash {
 }
 
 impl Serialize for FileHash {
-    fn serialize(&self, writer: &mut dyn std::io::Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn std::io::Write) -> Result<(), Self::Error> {
         writer.write_all(&self.0)?;
         Ok(())
     }
 }
 impl Deserialize for FileHash {
-    fn deserialize(reader: &mut dyn std::io::Read) -> Result<Self, Box<dyn std::error::Error>>
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn std::io::Read) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

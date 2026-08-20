@@ -30,14 +30,14 @@ impl FileInfo {
         FileInfo { path, hash, size }
     }
 
-    pub async fn new_relative(
-        path: PathBuf,
-        base: &Path,
-    ) -> Result<FileInfo, Box<dyn std::error::Error>> {
+    pub async fn new_relative(path: PathBuf, base: &Path) -> Result<FileInfo, std::io::Error> {
         let path = path.strip_prefix(base).unwrap_or(&path).to_path_buf();
         // path must be relative or a subpath of base
         if !path.is_relative() {
-            return Err("path is not relative".into());
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "path is not relative",
+            ));
         }
         let abs_path = base.join(&path);
         let size = fs::metadata(&abs_path).await?.len();

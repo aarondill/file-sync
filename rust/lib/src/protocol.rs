@@ -4,8 +4,10 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProtocolError {
+    #[error(transparent)]
     Io(#[from] std::io::Error),
-    MessageTooLong(#[from] std::num::TryFromIntError),
+    #[error("message too long")]
+    MessageTooLong,
 }
 
 pub async fn read_message(reader: &mut (dyn AsyncRead + Unpin + Send)) -> io::Result<Vec<u8>> {
@@ -18,7 +20,7 @@ pub async fn write_message(
     writer: &mut (dyn AsyncWrite + Unpin + Send),
     message: &[u8],
 ) -> Result<(), ProtocolError> {
-    let len: u16 = message.len().try_into()?;
+    let len: u16 = message.len().try_into().map_err(|| ProtocolError::MessageTooLong)?;
     writer.write_u16(len).await?;
     writer.write_all(message).await?;
     Ok(())

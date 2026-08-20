@@ -58,17 +58,32 @@ impl DownloadMessage {
 }
 
 impl Serialize for DownloadMessage {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         self.flags.bits().serialize(writer)?;
         self.file_count.serialize(writer)?;
         Ok(())
     }
 }
+#[derive(Debug, thiserror::Error)]
+pub enum MessageDeserializeError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("invalid flags")]
+    InvalidFlags,
+    #[error("error flag set to unexpected value")]
+    ErrorFlag,
+}
+
 impl Deserialize for DownloadMessage {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
-        let flags = Flags::from_bits(u8::deserialize(reader)?).unwrap();
+    type Error = MessageDeserializeError;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
+        let flags = Flags::from_bits(u8::deserialize(reader)?)
+            .ok_or(MessageDeserializeError::InvalidFlags)?;
         if flags.contains(Flags::isError) {
-            return Err("is an error".into());
+            return Err(MessageDeserializeError::ErrorFlag);
         }
         let file_count = u8::deserialize(reader)?;
         Ok(Self { flags, file_count })

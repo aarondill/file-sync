@@ -8,19 +8,47 @@ use crate::download_file::DownloadFile;
 use crate::download_message::{self, DownloadMessage};
 use crate::download_response::DownloadResponse;
 use crate::file_info::FileInfo;
-use crate::protocol::{read_message, write_message};
+use crate::protocol::{ProtocolError, read_message, write_message};
 use crate::serial::{Deserialize, Serialize};
+
+#[derive(Debug, thiserror::Error)]
+pub enum UploadError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Deserialize(download_message::MessageDeserializeError),
+    #[error(transparent)]
+    Protocol(ProtocolError),
+    #[error("requested file not in local list")]
+    FileNotFound,
+}
+impl From<download_message::MessageDeserializeError> for UploadError {
+    fn from(e: download_message::MessageDeserializeError) -> Self {
+        match e {
+            download_message::MessageDeserializeError::Io(e) => Self::Io(e),
+            e => Self::Deserialize(e),
+        }
+    }
+}
+impl From<ProtocolError> for UploadError {
+    fn from(e: ProtocolError) -> Self {
+        match e {
+            ProtocolError::Io(e) => Self::Io(e),
+            e => Self::Protocol(e),
+        }
+    }
+}
 
 async fn write_file_list<T: Borrow<FileInfo>>(
     socket: &mut (dyn AsyncWrite + Unpin + Send),
     list: &[T],
     srcdir: Option<&Path>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UploadError> {
     // Send file metadata
     let mut buf = Vec::with_capacity(4096);
     for node in list {
         let f: DownloadFile = node.borrow().into();
-        f.serialize(&mut buf).expect("error serializing download file");
+        f.serialize(&mut buf)?;
         write_message(socket, &buf).await?;
         buf.clear();
     }
@@ -39,7 +67,7 @@ async fn write_download_message<T: Borrow<FileInfo>>(
     socket: &mut (dyn AsyncWrite + Unpin + Send),
     list: &[T],
     srcdir: Option<&Path>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UploadError> {
     let msg = DownloadMessage::new(
         download_message::Flags::empty(),
         list.len().try_into().expect("too many files"),
@@ -55,7 +83,7 @@ pub async fn upload(
     write: &mut (dyn AsyncWrite + Unpin + Send),
     files: &[FileInfo],
     srcdir: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), UploadError> {
     // Send download message 1
     write_download_message(write, files, None).await?;
 
@@ -68,9 +96,7 @@ pub async fn upload(
     let filtered_list = resp
         .into_files()
         .into_iter()
-        .map(|f| {
-            files.iter().find(|&node| node.hash() == &f).ok_or("requested file not in local list")
-        })
+        .map(|f| files.iter().find(|&node| node.hash() == &f).ok_or(UploadError::FileNotFound))
         .collect::<Result<Vec<_>, _>>()?;
 
     write_download_message(write, &filtered_list, Some(srcdir)).await?;

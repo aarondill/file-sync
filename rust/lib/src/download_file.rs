@@ -48,7 +48,9 @@ impl std::convert::From<&FileInfo> for DownloadFile {
 }
 
 impl Serialize for DownloadFile {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         self.hash.serialize(writer)?;
         self.size.serialize(writer)?;
         self.name.serialize(writer)?;
@@ -56,7 +58,9 @@ impl Serialize for DownloadFile {
     }
 }
 impl Deserialize for DownloadFile {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let hash = FileHash::deserialize(reader)?;
         let size = u32::deserialize(reader)?;
         let name = VariableLengthString::deserialize(reader)?;

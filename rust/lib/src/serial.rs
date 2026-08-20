@@ -1,18 +1,22 @@
 // TODO: use serde eventually?
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 
 pub trait Deserialize {
-    fn deserialize(reader: &mut dyn Read) -> io::Result<Self>
+    type Error: std::error::Error + 'static;
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error>
     where
         Self: Sized;
 }
 
 pub trait Serialize {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()>;
+    type Error: std::error::Error + 'static;
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error>;
 }
 
 impl Deserialize for u8 {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let mut buf = [0u8; (Self::BITS / 8) as usize];
         reader.read_exact(&mut buf)?;
         Ok(Self::from_be_bytes(buf))
@@ -20,13 +24,17 @@ impl Deserialize for u8 {
 }
 
 impl Serialize for u8 {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         writer.write_all(&self.to_be_bytes())?;
         Ok(())
     }
 }
 impl Deserialize for u16 {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let mut buf = [0u8; (Self::BITS / 8) as usize];
         reader.read_exact(&mut buf)?;
         Ok(Self::from_be_bytes(buf))
@@ -34,13 +42,17 @@ impl Deserialize for u16 {
 }
 
 impl Serialize for u16 {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         writer.write_all(&self.to_be_bytes())?;
         Ok(())
     }
 }
 impl Deserialize for u32 {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let mut buf = [0u8; (Self::BITS / 8) as usize];
         reader.read_exact(&mut buf)?;
         Ok(Self::from_be_bytes(buf))
@@ -48,13 +60,17 @@ impl Deserialize for u32 {
 }
 
 impl Serialize for u32 {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         writer.write_all(&self.to_be_bytes())?;
         Ok(())
     }
 }
 impl Deserialize for u64 {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let mut buf = [0u8; (Self::BITS / 8) as usize];
         reader.read_exact(&mut buf)?;
         Ok(Self::from_be_bytes(buf))
@@ -62,13 +78,17 @@ impl Deserialize for u64 {
 }
 
 impl Serialize for u64 {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         writer.write_all(&self.to_be_bytes())?;
         Ok(())
     }
 }
 impl Deserialize for u128 {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let mut buf = [0u8; (Self::BITS / 8) as usize];
         reader.read_exact(&mut buf)?;
         Ok(Self::from_be_bytes(buf))
@@ -76,7 +96,9 @@ impl Deserialize for u128 {
 }
 
 impl Serialize for u128 {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         writer.write_all(&self.to_be_bytes())?;
         Ok(())
     }
@@ -84,6 +106,7 @@ impl Serialize for u128 {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn test_u128() {
         let data = 128;

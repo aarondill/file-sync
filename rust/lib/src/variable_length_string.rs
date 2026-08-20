@@ -61,7 +61,9 @@ impl std::convert::Into<String> for VariableLengthString {
 }
 
 impl Deserialize for VariableLengthString {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
         let length = u8::deserialize(reader)?;
         let mut value = [0u8; 255];
         reader.read_exact(&mut value[..length as usize])?;
@@ -69,7 +71,9 @@ impl Deserialize for VariableLengthString {
     }
 }
 impl Serialize for VariableLengthString {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>> {
+    type Error = std::io::Error;
+
+    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
         self.length.serialize(writer)?;
         writer.write_all(&self.value[..self.length as usize])?;
         Ok(())

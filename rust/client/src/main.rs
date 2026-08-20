@@ -12,6 +12,7 @@ use lib::file_info::FileInfo;
 use lib::protocol::write_message;
 use lib::serial::Serialize;
 use lib::upload::upload;
+use lib::util::check_readable;
 use lib::variable_length_string::VariableLengthString;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -143,7 +144,15 @@ async fn main() -> ExitCode {
 
         match state {
             SelectState::Downloading => {
-                let (mut read, mut write) = connection.split();
+                let (read, mut write) = connection.split();
+                let mut read = match check_readable(read) {
+                    Ok(None) => continue, // false positive
+                    Ok(Some(r)) => r,
+                    Err(e) => {
+                        eprintln!("error: {}", e);
+                        return ExitCode::FAILURE;
+                    }
+                };
                 download(&mut read, &mut write, &global_list, directory)
                     .await
                     .expect("download failed");

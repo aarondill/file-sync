@@ -9,4 +9,5 @@ pub mod file_info;
 pub mod protocol;
 pub mod serial;
 pub mod upload;
+pub mod util;
 pub mod variable_length_string;

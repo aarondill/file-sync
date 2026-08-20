@@ -11,6 +11,7 @@ use lib::file_info::FileInfo;
 use lib::protocol::read_message;
 use lib::serial::Deserialize;
 use lib::upload::upload;
+use lib::util::check_readable;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{RwLock, broadcast};
 use tokio::{io, pin};
@@ -76,7 +77,13 @@ async fn handle_client(
         match state {
             SelectState::Download => {
                 let mut global_list = global_list_lock.write().await;
-                let (mut read, mut write) = connection.split();
+
+                let (read, mut write) = connection.split();
+                let mut read = match check_readable(read)? {
+                    None => continue, // false positive
+                    Some(r) => r,
+                };
+
                 download(&mut read, &mut write, &global_list, directory).await?;
                 update_list(directory, &mut global_list).await;
                 send_upload.send(()).unwrap(); // tell other tasks to upload

@@ -12,10 +12,7 @@ pub fn check_readable<'a>(
     let mut buf = [0];
     match connection.try_read(&mut buf) {
         Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(None), // false positive
-        Ok(0) => {
-            eprintln!("connection closed");
-            Ok(Some(Box::pin(connection)))
-        }
+        Ok(0) => Err(io::Error::new(io::ErrorKind::ConnectionAborted, "connection closed")),
         Ok(1) => {
             // This is a hack to fix the false positives from connection.readable()
             let read = Cursor::new(buf).chain(connection); // chain the byte to the socket

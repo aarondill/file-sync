@@ -42,7 +42,7 @@ async fn read_file_list(
 }
 
 #[derive(Debug, thiserror::Error)]
-enum DownloadError {
+pub enum DownloadError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("deserialization error: {0}")]

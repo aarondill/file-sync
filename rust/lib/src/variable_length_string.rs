@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::io::{Read, Write};
 
 use crate::serial::{Deserialize, Serialize};
@@ -7,6 +8,13 @@ use crate::serial::{Deserialize, Serialize};
 pub struct VariableLengthString {
     length: u8,
     value: [u8; 255],
+}
+
+impl Display for VariableLengthString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = String::from_utf8_lossy(&self.value[..self.length as usize]);
+        write!(f, "{}", s)
+    }
 }
 
 impl VariableLengthString {
@@ -32,10 +40,6 @@ impl VariableLengthString {
 
     pub fn slice(self: &Self) -> &[u8] {
         return &self.value[..self.length as usize];
-    }
-
-    pub fn to_string(self: &Self) -> String {
-        return String::from_utf8_lossy(&self.value[..self.length as usize]).to_string();
     }
 }
 

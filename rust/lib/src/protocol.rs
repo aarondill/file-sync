@@ -20,7 +20,7 @@ pub async fn write_message(
     writer: &mut (dyn AsyncWrite + Unpin + Send),
     message: &[u8],
 ) -> Result<(), ProtocolError> {
-    let len: u16 = message.len().try_into().map_err(|| ProtocolError::MessageTooLong)?;
+    let len: u16 = message.len().try_into().map_err(|_| ProtocolError::MessageTooLong)?;
     writer.write_u16(len).await?;
     writer.write_all(message).await?;
     Ok(())

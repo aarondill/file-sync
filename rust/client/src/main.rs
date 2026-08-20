@@ -1,7 +1,6 @@
 // gethostname is not stable yet, i could use a crate, but i'd rather use the nightly feature
 #![feature(gethostname)]
 
-use std::error::Error;
 use std::io::Read;
 use std::path::Path;
 use std::process::ExitCode;

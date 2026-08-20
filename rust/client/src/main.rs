@@ -158,13 +158,10 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
                 update_list(directory, &mut global_list).await;
             }
             SelectState::Uploading => {
-                let mut buf = [0];
-                match connection.try_read(&mut buf) {
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
-                    Ok(0) => bail!("connection closed"),
-                    Ok(_) => bail!("upload pending while connection has data!"),
-                    Err(e) => bail!("error reading from connection: {}", e),
-                };
+                match check_readable(connection.split().0)? {
+                    Some(_) => bail!("upload pending while connection has data!"),
+                    None => {}
+                }
                 update_list(directory, &mut global_list).await; // files may change between downloads
                 let (mut read, mut write) = connection.split();
                 upload(&mut read, &mut write, &global_list, directory)

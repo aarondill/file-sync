@@ -1,4 +1,3 @@
-use core::panic;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -62,7 +61,7 @@ async fn handle_client(
                             eprintln!("upload pending lagged {} times", n);
                             SelectState::Upload
                         }
-                        Err(broadcast::error::RecvError::Closed) => panic!("somehow send closed (should be impossible)"),
+                        Err(broadcast::error::RecvError::Closed) => unreachable!("somehow send closed (should be impossible)"),
                     }
                 }
                 r = connection.readable() => {
@@ -100,17 +99,14 @@ async fn handle_client(
                         Err(broadcast::error::TryRecvError::Lagged(_)) => {}
                         Err(broadcast::error::TryRecvError::Empty) => break,
                         Err(broadcast::error::TryRecvError::Closed) => {
-                            panic!("somehow send closed (should be impossible)")
+                            unreachable!("somehow send closed (should be impossible)")
                         }
                     }
                 }
-                let mut buf = [0];
-                match connection.try_read(&mut buf) {
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
-                    Ok(0) => bail!("connection closed"),
-                    Ok(_) => bail!("upload pending while connection has data!"), // client is sending us data
-                    Err(e) => Err(e).context("error reading from connection")?,
-                };
+                match check_readable(connection.split().0)? {
+                    Some(_) => bail!("upload pending while connection has data!"),
+                    None => {}
+                }
                 let (mut read, mut write) = connection.split();
                 upload(&mut read, &mut write, &global_list, directory)
                     .await

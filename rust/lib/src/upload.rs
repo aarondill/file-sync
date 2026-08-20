@@ -2,8 +2,7 @@ use std::borrow::Borrow;
 use std::path::Path;
 
 use tokio::fs::File;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::download_file::DownloadFile;
 use crate::download_message::{self, DownloadMessage};
@@ -52,15 +51,16 @@ async fn write_download_message<T: Borrow<FileInfo>>(
 }
 
 pub async fn upload(
-    socket: &mut TcpStream,
+    read: &mut (dyn AsyncRead + Unpin + Send),
+    write: &mut (dyn AsyncWrite + Unpin + Send),
     files: &[FileInfo],
     srcdir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Send download message 1
-    write_download_message(socket, files, None).await?;
+    write_download_message(write, files, None).await?;
 
     // Receive download response
-    let msg = read_message(socket).await?;
+    let msg = read_message(read).await?;
     let mut cursor = std::io::Cursor::new(msg);
     let resp = DownloadResponse::deserialize(&mut cursor)?;
     assert_eq!(cursor.position(), cursor.into_inner().len() as u64); // EOF
@@ -73,6 +73,6 @@ pub async fn upload(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    write_download_message(socket, &filtered_list, Some(srcdir)).await?;
+    write_download_message(write, &filtered_list, Some(srcdir)).await?;
     Ok(())
 }

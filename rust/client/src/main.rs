@@ -150,7 +150,8 @@ async fn main() -> ExitCode {
                         eprintln!("error reading from connection: {}", e);
                         return ExitCode::FAILURE;
                     }
-                    download(&mut connection, &global_list, directory).await.expect("download failed");
+                    let (mut read, mut write) = connection.split();
+                    download(&mut read, &mut write, &global_list, directory).await.expect("download failed");
                     update_list(directory, &mut global_list).await;
                 }
             }
@@ -174,7 +175,8 @@ async fn main() -> ExitCode {
                 }
             };
             update_list(directory, &mut global_list).await; // files may change between downloads
-            upload(&mut connection, &global_list, directory).await.expect("upload failed");
+            let (mut read, mut write) = connection.split();
+            upload(&mut read, &mut write, &global_list, directory).await.expect("upload failed");
             upload_pending.store(false, std::sync::atomic::Ordering::SeqCst);
         }
     }

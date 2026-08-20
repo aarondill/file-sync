@@ -76,7 +76,8 @@ async fn handle_client(
         match state {
             SelectState::Download => {
                 let mut global_list = global_list_lock.write().await;
-                download(&mut connection, &global_list, directory).await?;
+                let (mut read, mut write) = connection.split();
+                download(&mut read, &mut write, &global_list, directory).await?;
                 update_list(directory, &mut global_list).await;
                 send_upload.send(()).unwrap(); // tell other tasks to upload
                 upload_pending.recv().await.unwrap(); // ignore our own upload
@@ -103,7 +104,10 @@ async fn handle_client(
                     Ok(_) => return Err("upload pending while connection has data!".into()), // client is sending us data
                     Err(e) => return Err(format!("error reading from connection: {}", e).into()),
                 };
-                upload(&mut connection, &global_list, directory).await.expect("upload failed");
+                let (mut read, mut write) = connection.split();
+                upload(&mut read, &mut write, &global_list, directory)
+                    .await
+                    .expect("upload failed");
             }
         }
     }
@@ -116,7 +120,7 @@ async fn main() -> ExitCode {
     let global_list_lock = Arc::new(RwLock::new(Vec::<FileInfo>::new()));
 
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args.len() > 2 {
+    if args.len() > 2 || args.is_empty() {
         eprintln!("usage: {} <directory> [port]", std::env::args().next().unwrap());
         return ExitCode::from(2);
     }

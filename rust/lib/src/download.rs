@@ -1,8 +1,7 @@
 use std::path::Path;
 
 use tokio::fs;
-use tokio::io::{self, AsyncRead, AsyncReadExt};
-use tokio::net::TcpStream;
+use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite};
 
 use crate::download_file::DownloadFile;
 use crate::download_message::DownloadMessage;
@@ -54,12 +53,13 @@ async fn read_download_message(
 }
 
 pub async fn download(
-    socket: &mut TcpStream,
+    read: &mut (dyn AsyncRead + Unpin + Send),
+    write: &mut (dyn AsyncWrite + Unpin + Send),
     files: &Vec<FileInfo>,
     srcdir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     //  read the download message
-    let mut recvlist = read_download_message(socket, None).await?;
+    let mut recvlist = read_download_message(read, None).await?;
     let to_delete = files
         .iter()
         .filter(|f| recvlist.iter().find(|o| o.path() == f.path()).is_none())
@@ -74,17 +74,17 @@ pub async fn download(
         let resp = DownloadResponse::new(download_response::Flags::empty(), hashes);
         let mut buf = Vec::with_capacity(4096);
         resp.serialize(&mut buf).expect("error serializing download response");
-        write_message(socket, &buf).await?;
+        write_message(write, &buf).await?;
     }
     // read download message 2
-    read_download_message(socket, Some(srcdir)).await?;
+    read_download_message(read, Some(srcdir)).await?;
     // delete files that we don't need anymore
     for node in to_delete {
         let mut path = srcdir.join(node.path());
         println!("deleting {}", path.display());
         // remove the file and parent directories
         fs::remove_file(&path).await?;
-        while path.pop() && path != Path::new("") {
+        while path.pop() && path != srcdir && !path.is_empty() {
             match fs::remove_dir(&path).await {
                 Ok(_) => break,
                 Err(e) if e.kind() == io::ErrorKind::NotFound => break,

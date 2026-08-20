@@ -117,7 +117,7 @@ async fn main() -> ExitCode {
 
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() > 2 {
-        eprintln!("usage: {} <directory> [port]", args[0]);
+        eprintln!("usage: {} <directory> [port]", std::env::args().next().unwrap());
         return ExitCode::from(2);
     }
     let directory = PathBuf::from(&args[0]);

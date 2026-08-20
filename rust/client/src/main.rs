@@ -62,11 +62,11 @@ async fn main() -> ExitCode {
     let (args, opts) = parse_args(std::env::args());
     let should_upload = opts.contains(&"-u".to_string());
     if args.len() != 2 {
-        eprintln!("usage: {} <server ip> <directory> [-u]", args[0]);
+        eprintln!("usage: {} <server ip> <directory> [-u]", std::env::args().next().unwrap());
         return ExitCode::from(2);
     }
-    let server = &args[1];
-    let directory = Path::new(&args[2]);
+    let server = &args[0];
+    let directory = Path::new(&args[1]);
     if !directory.is_dir() || directory.metadata().map_or(true, |m| m.permissions().readonly()) {
         eprintln!("directory is not readable or writable");
         return ExitCode::from(2);

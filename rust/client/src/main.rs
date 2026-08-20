@@ -1,11 +1,9 @@
 // gethostname is not stable yet, i could use a crate, but i'd rather use the nightly feature
 #![feature(gethostname)]
 
-use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 use std::process::ExitCode;
-use std::sync::atomic::AtomicBool;
 
 use futures::StreamExt;
 use lib::client_connect::{self, ClientConnect};
@@ -74,7 +72,7 @@ async fn main() -> ExitCode {
 
     // The server starts by sending an upload to the client unless the client
     // explicitly requests otherwise
-    let upload_pending = AtomicBool::new(should_upload);
+    let mut upload_pending = should_upload;
 
     update_list(directory, &mut global_list).await; // update the list before starting the server
 
@@ -92,21 +90,6 @@ async fn main() -> ExitCode {
         write_message(&mut connection, &buf).await.expect("error writing connect message");
     }
 
-    let mut commands: HashMap<char, Box<dyn FnMut() + Send>> = HashMap::new();
-    commands.insert('q', Box::new(|| tx_stop.send(true).unwrap()));
-    commands
-        .insert('u', Box::new(|| upload_pending.store(true, std::sync::atomic::Ordering::SeqCst)));
-    commands.insert(
-        'h',
-        Box::new(|| {
-            println!("commands: ");
-            println!("  q: quit");
-            println!("  u: upload");
-            println!("  h: help");
-            println!();
-        }),
-    );
-
     let (send, mut recv) = mpsc::channel(32);
     std::thread::spawn(move || {
         // Handle stdin input
@@ -115,7 +98,10 @@ async fn main() -> ExitCode {
             let Ok(c) = c else {
                 break;
             };
-            send.blocking_send(c).unwrap();
+            if c.is_ascii_whitespace() {
+                continue;
+            }
+            send.blocking_send(c as char).unwrap();
         }
     });
 
@@ -129,56 +115,83 @@ async fn main() -> ExitCode {
     }
 
     while !rx_stop.has_changed().unwrap() {
-        if !upload_pending.load(std::sync::atomic::Ordering::SeqCst) {
+        enum SelectState {
+            Command(char),
+            Downloading,
+            Uploading,
+        }
+        let state = if upload_pending {
+            SelectState::Uploading
+        } else {
             tokio::select! {
                 recv = recv.recv() => { // user input
                     let Some(c) = recv else {
                         eprintln!("connection closed");
                         return ExitCode::FAILURE;
                     };
-                    let c = c as char;
-                    if c.is_ascii_whitespace() {
-                        continue;
-                    }
-                    match commands.get_mut(&c) {
-                        Some(f) => f(),
-                        None => eprintln!("unknown command: {}", c),
-                    }
-                }
+                    SelectState::Command(c)
+                },
                 r = connection.readable() => {
                     if let Err(e) = r {
                         eprintln!("error reading from connection: {}", e);
                         return ExitCode::FAILURE;
                     }
-                    let (mut read, mut write) = connection.split();
-                    download(&mut read, &mut write, &global_list, directory).await.expect("download failed");
-                    update_list(directory, &mut global_list).await;
+                    SelectState::Downloading
                 }
             }
-        }
+        };
 
-        if upload_pending.load(std::sync::atomic::Ordering::SeqCst) {
-            let mut buf = [0];
-            match connection.try_read(&mut buf) {
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
-                Ok(0) => {
-                    eprintln!("connection closed");
+        match state {
+            SelectState::Downloading => {
+                let (mut read, mut write) = connection.split();
+                download(&mut read, &mut write, &global_list, directory)
+                    .await
+                    .expect("download failed");
+                update_list(directory, &mut global_list).await;
+            }
+            SelectState::Uploading => {
+                let mut buf = [0];
+                match connection.try_read(&mut buf) {
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
+                    Ok(0) => {
+                        eprintln!("connection closed");
+                        return ExitCode::FAILURE;
+                    }
+                    Ok(_) => {
+                        eprintln!("upload pending while connection has data!");
+                        return ExitCode::FAILURE;
+                    }
+                    Err(e) => {
+                        eprintln!("error reading from connection: {}", e);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                update_list(directory, &mut global_list).await; // files may change between downloads
+                let (mut read, mut write) = connection.split();
+                upload(&mut read, &mut write, &global_list, directory)
+                    .await
+                    .expect("upload failed");
+            }
+            SelectState::Command(c) => match c {
+                'q' => {
+                    tx_stop.send(true).unwrap();
+                    continue;
+                }
+                'u' => upload_pending = true, // the upload will happen on the next loop
+                'h' => {
+                    println!("commands: ");
+                    println!("  q: quit");
+                    println!("  u: upload");
+                    println!("  h: help");
+                    println!();
+                    continue;
+                }
+                _ => {
+                    eprintln!("unknown command");
                     return ExitCode::FAILURE;
                 }
-                Ok(_) => {
-                    eprintln!("upload pending while connection has data!");
-                    return ExitCode::FAILURE;
-                }
-                Err(e) => {
-                    eprintln!("error reading from connection: {}", e);
-                    return ExitCode::FAILURE;
-                }
-            };
-            update_list(directory, &mut global_list).await; // files may change between downloads
-            let (mut read, mut write) = connection.split();
-            upload(&mut read, &mut write, &global_list, directory).await.expect("upload failed");
-            upload_pending.store(false, std::sync::atomic::Ordering::SeqCst);
-        }
+            },
+        };
     }
     return ExitCode::SUCCESS;
 }

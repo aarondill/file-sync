@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::Path;
 use std::process::ExitCode;
 
+use anyhow::{Context, Result};
 use futures::StreamExt;
 use lib::client_connect::{self, ClientConnect};
 use lib::download::download;
@@ -90,14 +91,16 @@ async fn process(
         .rsplit_once(":")
         .map(|(host, port)| (host, port.parse().unwrap()))
         .unwrap_or((server, 8080));
-    let mut connection = TcpStream::connect(addr).await.expect("error connecting to server");
+    let mut connection = TcpStream::connect(addr).await.context("error connecting to server")?;
 
     // send connect message
     {
         let msg = init_connect_msg(should_upload);
         let mut buf = Vec::with_capacity(4096);
-        msg.serialize(&mut buf).expect("error serializing client connect message");
-        write_message(&mut connection, &buf).await.expect("error writing connect message");
+        msg.serialize(&mut buf)
+            .map_err(anyhow::Error::msg)
+            .context("error serializing client connect message")?;
+        write_message(&mut connection, &buf).await.context("error writing connect message")?;
     }
 
     let (send, mut recv) = mpsc::channel(32);

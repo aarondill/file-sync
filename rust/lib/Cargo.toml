@@ -7,6 +7,7 @@ edition = "2024"
 bitflags = "2.13.1"
 futures = "0.3.34"
 md-5 = "0.11.0"
+thiserror = "2.0.20"
 tokio = { version = "1.53.1", features = ["full"] }
 walkdir = "2.5.0"
 

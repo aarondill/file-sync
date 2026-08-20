@@ -1,8 +1,14 @@
+use std::io;
+
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-pub async fn read_message(
-    reader: &mut (dyn AsyncRead + Unpin + Send),
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+#[derive(Debug, thiserror::Error)]
+pub enum ProtocolError {
+    Io(#[from] std::io::Error),
+    MessageTooLong(#[from] std::num::TryFromIntError),
+}
+
+pub async fn read_message(reader: &mut (dyn AsyncRead + Unpin + Send)) -> io::Result<Vec<u8>> {
     let len = reader.read_u16().await? as usize;
     let mut buffer = vec![0u8; len];
     reader.read_exact(&mut buffer).await?;
@@ -11,7 +17,7 @@ pub async fn read_message(
 pub async fn write_message(
     writer: &mut (dyn AsyncWrite + Unpin + Send),
     message: &[u8],
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), ProtocolError> {
     let len: u16 = message.len().try_into()?;
     writer.write_u16(len).await?;
     writer.write_all(message).await?;

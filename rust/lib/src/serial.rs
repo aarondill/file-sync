@@ -1,15 +1,14 @@
 // TODO: use serde eventually?
-
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 
 pub trait Deserialize {
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Box<dyn std::error::Error>>
+    fn deserialize(reader: &mut dyn Read) -> io::Result<Self>
     where
         Self: Sized;
 }
 
 pub trait Serialize {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Box<dyn std::error::Error>>;
+    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()>;
 }
 
 impl Deserialize for u8 {
@@ -85,7 +84,6 @@ impl Serialize for u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn test_u128() {
         let data = 128;

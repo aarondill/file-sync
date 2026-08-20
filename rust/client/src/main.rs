@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::Path;
 use std::process::ExitCode;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use futures::StreamExt;
 use lib::client_connect::{self, ClientConnect};
 use lib::download::download;
@@ -60,24 +60,23 @@ async fn main() -> ExitCode {
     let (args, opts) = parse_args(std::env::args());
     let should_upload = opts.contains(&"-u".to_string());
     if args.len() != 2 {
-        eprintln!("usage: {} <server ip> <directory> [-u]", std::env::args().next().unwrap());
+        eprintln!(
+            "usage: {} <server ip> <directory> [-u]",
+            std::env::args().next().expect("argv[0] is not set")
+        );
         return ExitCode::from(2);
     }
     let server = &args[0];
     let directory = Path::new(&args[1]);
     if !directory.is_dir() || directory.metadata().map_or(true, |m| m.permissions().readonly()) {
         eprintln!("directory is not readable or writable");
-        return ExitCode::from(2);
+        return ExitCode::from(3);
     }
 
     process(server, directory, should_upload).await.unwrap();
     ExitCode::SUCCESS
 }
-async fn process(
-    server: &str,
-    directory: &Path,
-    should_upload: bool,
-) -> Result<(), Box<dyn Error>> {
+async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<()> {
     let mut global_list = Vec::<FileInfo>::new();
     let (tx_stop, rx_stop) = tokio::sync::watch::channel(false);
 
@@ -89,7 +88,8 @@ async fn process(
 
     let addr = server
         .rsplit_once(":")
-        .map(|(host, port)| (host, port.parse().unwrap()))
+        .map(|(host, port)| port.parse().context("invalid port").map(|p| (host, p)))
+        .transpose()?
         .unwrap_or((server, 8080));
     let mut connection = TcpStream::connect(addr).await.context("error connecting to server")?;
 
@@ -97,9 +97,7 @@ async fn process(
     {
         let msg = init_connect_msg(should_upload);
         let mut buf = Vec::with_capacity(4096);
-        msg.serialize(&mut buf)
-            .map_err(anyhow::Error::msg)
-            .context("error serializing client connect message")?;
+        msg.serialize(&mut buf).context("error serializing client connect message")?;
         write_message(&mut connection, &buf).await.context("error writing connect message")?;
     }
 
@@ -108,13 +106,11 @@ async fn process(
         // Handle stdin input
         let handle = std::io::stdin().lock();
         for c in handle.bytes() {
-            let Ok(c) = c else {
-                break;
-            };
-            if c.is_ascii_whitespace() {
-                continue;
+            match c {
+                Err(_) => break,
+                Ok(c) if c.is_ascii_whitespace() => continue,
+                Ok(c) => send.blocking_send(c as char).unwrap(),
             }
-            send.blocking_send(c as char).unwrap();
         }
     });
 
@@ -127,7 +123,7 @@ async fn process(
         });
     }
 
-    while !rx_stop.has_changed().unwrap() {
+    while !rx_stop.has_changed().expect("The stop channel can't be closed") {
         enum SelectState {
             Command(char),
             Downloading,
@@ -138,14 +134,12 @@ async fn process(
         } else {
             tokio::select! {
                 recv = recv.recv() => { // user input
-                    let Some(c) = recv else {
-                        return Err("connection closed".into());
-                    };
+                    let Some(c) = recv else { bail!("connection closed") };
                     SelectState::Command(c)
                 },
                 r = connection.readable() => {
                     if let Err(e) = r {
-                        return Err(format!("error reading from connection: {}", e).into());
+                        bail!( "error reading from connection: {}", e);
                     }
                     SelectState::Downloading
                 }
@@ -161,38 +155,38 @@ async fn process(
                 };
                 download(&mut read, &mut write, &global_list, directory)
                     .await
-                    .expect("download failed");
+                    .context("download failed")?;
                 update_list(directory, &mut global_list).await;
             }
             SelectState::Uploading => {
                 let mut buf = [0];
                 match connection.try_read(&mut buf) {
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
-                    Ok(0) => return Err("connection closed".into()),
-                    Ok(_) => return Err("upload pending while connection has data!".into()),
-                    Err(e) => return Err(format!("error reading from connection: {}", e).into()),
+                    Ok(0) => bail!("connection closed"),
+                    Ok(_) => bail!("upload pending while connection has data!"),
+                    Err(e) => bail!("error reading from connection: {}", e),
                 };
                 update_list(directory, &mut global_list).await; // files may change between downloads
                 let (mut read, mut write) = connection.split();
                 upload(&mut read, &mut write, &global_list, directory)
                     .await
-                    .expect("upload failed");
+                    .context("upload failed")?;
             }
             SelectState::Command(c) => match c {
                 'q' => {
                     tx_stop.send(true).unwrap();
-                    continue;
                 }
                 'u' => upload_pending = true, // the upload will happen on the next loop
                 'h' => {
-                    println!("commands: ");
-                    println!("  q: quit");
-                    println!("  u: upload");
-                    println!("  h: help");
-                    println!();
-                    continue;
+                    eprintln!("commands: ");
+                    eprintln!("  q: quit");
+                    eprintln!("  u: upload");
+                    eprintln!("  h: help");
+                    eprintln!();
                 }
-                _ => return Err("unknown command".into()),
+                _ => {
+                    eprintln!("unknown command");
+                }
             },
         };
     }

@@ -53,7 +53,7 @@ async fn handle_client(
         } else {
             tokio::select! {
                 biased; // check top-to-bottom
-                // TODO: better handle cancelation token
+                // TODO: better handle cancellation token
                 _ = token.cancelled() => break,
                 r = upload_pending.recv() => {
                     match r {

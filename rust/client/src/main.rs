@@ -17,7 +17,7 @@ use lib::util::check_readable;
 use lib::variable_length_string::VariableLengthString;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tokio::{io, pin};
+use tokio::pin;
 
 // Initialize a client connect message
 fn init_connect_msg(upload: bool) -> ClientConnect {

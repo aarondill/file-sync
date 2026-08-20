@@ -13,7 +13,7 @@ use lib::upload::upload;
 use lib::util::check_readable;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{RwLock, broadcast};
-use tokio::{io, pin};
+use tokio::pin;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 

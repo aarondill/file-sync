@@ -72,12 +72,17 @@ async fn main() -> ExitCode {
         return ExitCode::from(3);
     }
 
-    process(server, directory, should_upload).await.unwrap();
-    ExitCode::SUCCESS
+    match process(server, directory, should_upload).await {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: {}", e);
+            ExitCode::FAILURE
+        }
+    }
 }
 async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<()> {
     let mut global_list = Vec::<FileInfo>::new();
-    let (tx_stop, rx_stop) = tokio::sync::watch::channel(false);
+    let (tx_stop, mut rx_stop) = tokio::sync::watch::channel(false);
 
     // The server starts by sending an upload to the client unless the client
     // explicitly requests otherwise
@@ -117,12 +122,12 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
         let tx_stop = tx_stop.clone();
         tokio::spawn(async move {
             // handle ctrl-c
-            tokio::signal::ctrl_c().await.expect("error handling ctrl-c");
+            tokio::signal::ctrl_c().await.expect("failed to listen for ctrl-c");
             tx_stop.send(true).unwrap();
         });
     }
 
-    while !rx_stop.has_changed().expect("The stop channel can't be closed") {
+    loop {
         enum SelectState {
             Command(char),
             Downloading,
@@ -133,6 +138,7 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
             SelectState::Uploading
         } else {
             tokio::select! {
+                _ = rx_stop.changed() => break,
                 recv = recv.recv() => { // user input
                     let Some(c) = recv else { bail!("connection closed") };
                     SelectState::Command(c)

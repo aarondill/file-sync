@@ -57,8 +57,7 @@ fn parse_args(iter: impl Iterator<Item = String>) -> (Vec<String>, Vec<String>) 
 #[tokio::main]
 async fn main() -> ExitCode {
     let mut global_list = Vec::<FileInfo>::new();
-    // TODO: ctrl-c
-    let stop = AtomicBool::new(false);
+    let (tx_stop, rx_stop) = tokio::sync::watch::channel(false);
 
     let (args, opts) = parse_args(std::env::args());
     let should_upload = opts.contains(&"-u".to_string());
@@ -94,12 +93,7 @@ async fn main() -> ExitCode {
     }
 
     let mut commands: HashMap<char, Box<dyn FnMut() + Send>> = HashMap::new();
-    commands.insert(
-        'q',
-        Box::new(|| {
-            stop.store(true, std::sync::atomic::Ordering::SeqCst);
-        }),
-    );
+    commands.insert('q', Box::new(|| tx_stop.send(true).unwrap()));
     commands
         .insert('u', Box::new(|| upload_pending.store(true, std::sync::atomic::Ordering::SeqCst)));
     commands.insert(
@@ -125,7 +119,16 @@ async fn main() -> ExitCode {
         }
     });
 
-    while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+    {
+        let tx_stop = tx_stop.clone();
+        tokio::spawn(async move {
+            // handle ctrl-c
+            tokio::signal::ctrl_c().await.expect("error handling ctrl-c");
+            tx_stop.send(true).unwrap();
+        });
+    }
+
+    while !rx_stop.has_changed().unwrap() {
         if !upload_pending.load(std::sync::atomic::Ordering::SeqCst) {
             tokio::select! {
                 recv = recv.recv() => { // user input

@@ -21,7 +21,9 @@ impl FileHash {
         Ok(Self(hash))
     }
 
-    pub async fn new(f: &mut (dyn AsyncRead + Unpin)) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(
+        f: &mut (dyn AsyncRead + Unpin + Send),
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut hasher = Md5::new();
         let mut buf = [0; 4096];
         loop {

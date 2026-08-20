@@ -13,7 +13,7 @@ use crate::protocol::{read_message, write_message};
 use crate::serial::{Deserialize, Serialize};
 
 async fn write_file_list<T: Borrow<FileInfo>>(
-    socket: &mut (dyn AsyncWrite + Unpin),
+    socket: &mut (dyn AsyncWrite + Unpin + Send),
     list: &[T],
     srcdir: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -37,7 +37,7 @@ async fn write_file_list<T: Borrow<FileInfo>>(
 }
 
 async fn write_download_message<T: Borrow<FileInfo>>(
-    socket: &mut (dyn AsyncWrite + Unpin),
+    socket: &mut (dyn AsyncWrite + Unpin + Send),
     list: &[T],
     srcdir: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {

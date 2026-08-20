@@ -1,7 +1,7 @@
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub async fn read_message(
-    reader: &mut (dyn AsyncRead + Unpin),
+    reader: &mut (dyn AsyncRead + Unpin + Send),
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let len = reader.read_u16().await? as usize;
     let mut buffer = vec![0u8; len];
@@ -9,7 +9,7 @@ pub async fn read_message(
     Ok(buffer)
 }
 pub async fn write_message(
-    writer: &mut (dyn AsyncWrite + Unpin),
+    writer: &mut (dyn AsyncWrite + Unpin + Send),
     message: &[u8],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let len: u16 = message.len().try_into()?;

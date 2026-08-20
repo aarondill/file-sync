@@ -15,7 +15,7 @@ use crate::serial::{Deserialize, Serialize};
 // if destdir is non-null, the file contents will be read and written to
 // disk
 async fn read_file_list(
-    socket: &mut (dyn AsyncRead + Unpin),
+    socket: &mut (dyn AsyncRead + Unpin + Send),
     file_count: u8,
     destdir: Option<&Path>,
 ) -> Result<Vec<FileInfo>, Box<dyn std::error::Error>> {
@@ -45,7 +45,7 @@ async fn read_file_list(
 // if destdir is NULL, the files will not be read from the message (ie. the
 // uploader must not send the file contents)
 async fn read_download_message(
-    socket: &mut (dyn AsyncRead + Unpin),
+    socket: &mut (dyn AsyncRead + Unpin + Send),
     destdir: Option<&Path>,
 ) -> Result<Vec<FileInfo>, Box<dyn std::error::Error>> {
     let msg = read_message(socket).await?;

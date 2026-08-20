@@ -12,8 +12,8 @@ use lib::serial::Deserialize;
 use lib::upload::upload;
 use lib::util::check_readable;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{RwLock, broadcast};
 use tokio::pin;
+use tokio::sync::{RwLock, broadcast};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 
@@ -36,6 +36,7 @@ async fn handle_client(
     // recv connect message
     let msg = read_message(&mut connection).await.context("error reading connect message")?;
     let msg = ClientConnect::deserialize(&mut &msg[..])?;
+    let client_name = msg.client_name().to_string();
     // we upload unless the client wants to upload
     let mut initial_upload = !msg.flags().contains(client_connect::Flags::IntentToUpload);
 
@@ -73,6 +74,7 @@ async fn handle_client(
 
         match state {
             SelectState::Download => {
+                println!("Downloading from client: {client_name}");
                 let mut global_list = global_list_lock.write().await;
 
                 let (read, mut write) = connection.split();
@@ -89,6 +91,7 @@ async fn handle_client(
                 upload_pending.recv().await.unwrap(); // ignore our own upload
             }
             SelectState::Upload => {
+                println!("Uploading to client: {client_name}");
                 // grab read lock before emptying the upload pending channel
                 // this makes it impossible for the upload to be triggered while we are reading
                 // (since it needs to grab the write lock)

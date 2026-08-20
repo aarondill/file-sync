@@ -16,8 +16,8 @@ use lib::upload::upload;
 use lib::util::check_readable;
 use lib::variable_length_string::VariableLengthString;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
 use tokio::pin;
+use tokio::sync::mpsc;
 
 // Initialize a client connect message
 fn init_connect_msg(upload: bool) -> ClientConnect {
@@ -148,6 +148,7 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
 
         match state {
             SelectState::Downloading => {
+                println!("downloading");
                 let (read, mut write) = connection.split();
                 let mut read = match check_readable(read)? {
                     None => continue, // false positive
@@ -159,6 +160,7 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
                 update_list(directory, &mut global_list).await;
             }
             SelectState::Uploading => {
+                println!("uploading");
                 match check_readable(connection.split().0)? {
                     Some(_) => bail!("upload pending while connection has data!"),
                     None => {}

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.104"
 futures = "0.3.34"
 lib = { version = "0.1.0", path = "../lib" }
 tokio = { version = "1.53.1", features = ["full"] }

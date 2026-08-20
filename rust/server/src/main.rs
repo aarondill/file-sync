@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use anyhow::{Context, Result, bail};
 use futures::StreamExt;
 use lib::client_connect::{self, ClientConnect};
 use lib::download::download;
@@ -33,9 +34,9 @@ async fn handle_client(
     global_list_lock: Arc<RwLock<Vec<FileInfo>>>,
     token: CancellationToken,
     send_upload: broadcast::Sender<()>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     // recv connect message
-    let msg = read_message(&mut connection).await?;
+    let msg = read_message(&mut connection).await.context("error reading connect message")?;
     let msg = ClientConnect::deserialize(&mut &msg[..])?;
     // we upload unless the client wants to upload
     let mut initial_upload = !msg.flags().contains(client_connect::Flags::IntentToUpload);
@@ -66,10 +67,8 @@ async fn handle_client(
                     }
                 }
                 r = connection.readable() => {
-                    match r {
-                        Err(e) => return Err(format!("error reading from connection: {}", e).into()),
-                        Ok(()) => SelectState::Download,
-                    }
+                     r.context("error reading from connection")?;
+                    SelectState::Download
                 }
             }
         };
@@ -84,7 +83,9 @@ async fn handle_client(
                     Some(r) => r,
                 };
 
-                download(&mut read, &mut write, &global_list, directory).await?;
+                download(&mut read, &mut write, &global_list, directory)
+                    .await
+                    .context("error downloading")?;
                 update_list(directory, &mut global_list).await;
                 send_upload.send(()).unwrap(); // tell other tasks to upload
                 upload_pending.recv().await.unwrap(); // ignore our own upload
@@ -107,14 +108,14 @@ async fn handle_client(
                 let mut buf = [0];
                 match connection.try_read(&mut buf) {
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {} // ok
-                    Ok(0) => return Err("connection closed".into()),
-                    Ok(_) => return Err("upload pending while connection has data!".into()), // client is sending us data
-                    Err(e) => return Err(format!("error reading from connection: {}", e).into()),
+                    Ok(0) => bail!("connection closed"),
+                    Ok(_) => bail!("upload pending while connection has data!"), // client is sending us data
+                    Err(e) => Err(e).context("error reading from connection")?,
                 };
                 let (mut read, mut write) = connection.split();
                 upload(&mut read, &mut write, &global_list, directory)
                     .await
-                    .expect("upload failed");
+                    .context("upload failed")?;
             }
         }
     }
@@ -128,7 +129,10 @@ async fn main() -> ExitCode {
 
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() > 2 || args.is_empty() {
-        eprintln!("usage: {} <directory> [port]", std::env::args().next().unwrap());
+        eprintln!(
+            "usage: {} <directory> [port]",
+            std::env::args().next().expect("argv[0] not set")
+        );
         return ExitCode::from(2);
     }
     let directory = PathBuf::from(&args[0]);
@@ -136,7 +140,7 @@ async fn main() -> ExitCode {
 
     if !directory.is_dir() || directory.metadata().map_or(true, |m| m.permissions().readonly()) {
         eprintln!("directory is not readable or writable");
-        return ExitCode::from(2);
+        return ExitCode::from(3);
     }
 
     {

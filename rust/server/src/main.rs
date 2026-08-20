@@ -74,7 +74,6 @@ async fn handle_client(
 
         match state {
             SelectState::Download => {
-                println!("Downloading from client: {client_name}");
                 let mut global_list = global_list_lock.write().await;
 
                 let (read, mut write) = connection.split();
@@ -83,6 +82,7 @@ async fn handle_client(
                     Some(r) => r,
                 };
 
+                println!("Downloading from client: {client_name}");
                 download(&mut read, &mut write, &global_list, directory)
                     .await
                     .context("error downloading")?;
@@ -91,7 +91,6 @@ async fn handle_client(
                 upload_pending.recv().await.unwrap(); // ignore our own upload
             }
             SelectState::Upload => {
-                println!("Uploading to client: {client_name}");
                 // grab read lock before emptying the upload pending channel
                 // this makes it impossible for the upload to be triggered while we are reading
                 // (since it needs to grab the write lock)
@@ -111,6 +110,7 @@ async fn handle_client(
                     None => {}
                 }
                 let (mut read, mut write) = connection.split();
+                println!("Uploading to client: {client_name}");
                 upload(&mut read, &mut write, &global_list, directory)
                     .await
                     .context("upload failed")?;

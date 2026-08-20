@@ -154,23 +154,24 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
 
         match state {
             SelectState::Downloading => {
-                println!("downloading");
                 let (read, mut write) = connection.split();
                 let mut read = match check_readable(read)? {
                     None => continue, // false positive
                     Some(r) => r,
                 };
+
+                println!("downloading");
                 download(&mut read, &mut write, &global_list, directory)
                     .await
                     .context("download failed")?;
                 update_list(directory, &mut global_list).await;
             }
             SelectState::Uploading => {
-                println!("uploading");
                 match check_readable(connection.split().0)? {
                     Some(_) => bail!("upload pending while connection has data!"),
                     None => {}
                 }
+                println!("uploading");
                 update_list(directory, &mut global_list).await; // files may change between downloads
                 let (mut read, mut write) = connection.split();
                 upload(&mut read, &mut write, &global_list, directory)

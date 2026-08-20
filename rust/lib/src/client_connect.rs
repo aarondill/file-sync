@@ -21,6 +21,18 @@ pub struct ClientConnect {
 }
 
 impl ClientConnect {
+    pub fn protocol_version(&self) -> u8 {
+        self.protocol_version
+    }
+
+    pub fn flags(&self) -> &Flags {
+        &self.flags
+    }
+
+    pub fn client_name(&self) -> &VariableLengthString {
+        &self.client_name
+    }
+
     pub fn new(flags: Flags, client_name: VariableLengthString) -> Self {
         Self { protocol_version: PROTOCOL_VERSION, flags, client_name }
     }

@@ -129,6 +129,7 @@ async fn process(server: &str, directory: &Path, should_upload: bool) -> Result<
             Uploading,
         }
         let state = if upload_pending {
+            upload_pending = false;
             SelectState::Uploading
         } else {
             tokio::select! {

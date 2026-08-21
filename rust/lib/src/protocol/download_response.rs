@@ -2,9 +2,9 @@ use std::io::{Read, Write};
 
 use bitflags::bitflags;
 
-use crate::download_message::MessageDeserializeError;
-use crate::file_hash::FileHash;
-use crate::serial::{Deserialize, Serialize};
+use super::download_message::MessageDeserializeError;
+use crate::md5::Hash;
+use crate::serial::{self, Deserialize, Serialize, deserialize};
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,7 +16,7 @@ bitflags! {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DownloadResponse {
     flags: Flags,
-    files: Vec<FileHash>,
+    files: Vec<Hash>,
 }
 
 impl DownloadResponse {
@@ -24,11 +24,11 @@ impl DownloadResponse {
         &self.flags
     }
 
-    pub fn into_files(self) -> Vec<FileHash> {
+    pub fn into_files(self) -> Vec<Hash> {
         self.files
     }
 
-    pub fn new(flags: Flags, files: Vec<FileHash>) -> Self {
+    pub fn new(flags: Flags, files: Vec<Hash>) -> Self {
         assert!(!flags.contains(Flags::isError));
         u8::try_from(files.len()).expect("too many files");
         Self { flags, files }
@@ -36,9 +36,7 @@ impl DownloadResponse {
 }
 
 impl Serialize for DownloadResponse {
-    type Error = std::io::Error;
-
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
+    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         self.flags.bits().serialize(writer)?;
         let len: u8 = self.files.len() as u8;
         len.serialize(writer)?;
@@ -52,27 +50,27 @@ impl Serialize for DownloadResponse {
 impl Deserialize for DownloadResponse {
     type Error = MessageDeserializeError;
 
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
-        let flags = Flags::from_bits(u8::deserialize(reader)?)
-            .ok_or(MessageDeserializeError::InvalidFlags)?;
-        if flags.contains(Flags::isError) {
-            return Err(MessageDeserializeError::ErrorFlag);
-        }
-        let file_count = u8::deserialize(reader)?;
+    fn deserialize(reader: &mut dyn Read) -> serial::Result<Self, Self::Error> {
+        let flags = match Flags::from_bits(deserialize!(reader, u8)) {
+            Some(flags) if !flags.contains(Flags::isError) => flags,
+            Some(_) => return Ok(Err(MessageDeserializeError::ErrorFlag)),
+            None => return Ok(Err(MessageDeserializeError::InvalidFlags)),
+        };
+        let file_count = deserialize!(reader, u8);
         let mut files = Vec::with_capacity(file_count as usize);
         for _ in 0..file_count {
-            files.push(FileHash::deserialize(reader)?);
+            files.push(deserialize!(reader, Hash));
         }
-        Ok(Self { flags, files })
+        Ok(Ok(Self { flags, files }))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::file_hash::FileHash;
+    use crate::md5::Hash;
 
     fn test_file() -> DownloadResponse {
-        DownloadResponse::new(Flags::empty(), vec![FileHash::new_from_bytes([1; 16])])
+        DownloadResponse::new(Flags::empty(), vec![Hash::from_bytes([1; 16])])
     }
     const TEST_BYTES: [u8; 18] = [
         0, // flags
@@ -90,7 +88,7 @@ mod tests {
     #[test]
     fn deserialize_works() {
         let bytes = TEST_BYTES.clone();
-        let message = DownloadResponse::deserialize(&mut bytes.as_slice()).unwrap();
+        let message = DownloadResponse::deserialize(&mut bytes.as_slice()).unwrap().unwrap();
         assert_eq!(message, test_file());
     }
     #[test]
@@ -99,7 +97,7 @@ mod tests {
         let mut buffer = Vec::new();
         message.serialize(&mut buffer).unwrap();
 
-        let deserialized = DownloadResponse::deserialize(&mut buffer.as_slice()).unwrap();
+        let deserialized = DownloadResponse::deserialize(&mut buffer.as_slice()).unwrap().unwrap();
         assert_eq!(message, deserialized);
     }
 }

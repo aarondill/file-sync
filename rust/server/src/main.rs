@@ -4,13 +4,11 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
 use futures::StreamExt;
-use lib::client_connect::{self, ClientConnect};
-use lib::download::download;
+use lib::common::{download, upload};
 use lib::file_info::FileInfo;
-use lib::protocol::read_message;
+use lib::io::{check_readable, read_message};
+use lib::protocol::{ClientConnect, client_connect};
 use lib::serial::Deserialize;
-use lib::upload::upload;
-use lib::util::check_readable;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::pin;
 use tokio::sync::{RwLock, broadcast};
@@ -35,7 +33,7 @@ async fn handle_client(
 ) -> Result<()> {
     // recv connect message
     let msg = read_message(&mut connection).await.context("error reading connect message")?;
-    let msg = ClientConnect::deserialize(&mut &msg[..])?;
+    let msg = ClientConnect::deserialize(&mut &msg[..])??;
     let client_name = msg.client_name().to_string();
     // we upload unless the client wants to upload
     let mut initial_upload = !msg.flags().contains(client_connect::Flags::IntentToUpload);

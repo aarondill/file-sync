@@ -1,15 +1,35 @@
+use std::error::Error;
 use std::path::Path;
 
 use tokio::fs;
 use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite};
 
-use crate::download_file::DownloadFile;
-use crate::download_message::{DownloadMessage, MessageDeserializeError};
-use crate::download_response::{self, DownloadResponse};
-use crate::file_hash::FileHash;
 use crate::file_info::FileInfo;
-use crate::protocol::{ProtocolError, read_message, write_message};
-use crate::serial::{Deserialize, Serialize};
+use crate::io::{ProtocolError, read_message, write_message};
+use crate::md5::Hash;
+use crate::protocol::{
+    DownloadFile, DownloadMessage, DownloadResponse, download_response,
+};
+use crate::serial::{Deserialize, Serialize, from_infallible};
+
+#[derive(Debug, thiserror::Error)]
+pub enum DownloadError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("protocol error: {0}")]
+    Protocol(ProtocolError),
+    #[error("deserialization error: {0}")]
+    Deserialization(#[source] Box<dyn Error + Send + Sync + 'static>),
+}
+impl From<ProtocolError> for DownloadError {
+    fn from(e: ProtocolError) -> Self {
+        match e {
+            ProtocolError::Io(e) => Self::Io(e),
+            _ => Self::Protocol(e),
+        }
+    }
+}
+from_infallible!(DownloadError);
 
 // if destdir is non-null, the file contents will be read and written to
 // disk
@@ -17,12 +37,14 @@ async fn read_file_list(
     socket: &mut (dyn AsyncRead + Unpin + Send),
     file_count: u8,
     destdir: Option<&Path>,
-) -> Result<Vec<FileInfo>, std::io::Error> {
+) -> Result<Vec<FileInfo>, DownloadError> {
     // recv the file info
     let mut list = Vec::<FileInfo>::with_capacity(file_count as usize);
     for _ in 0..file_count {
         let msg = read_message(socket).await?;
-        let file = DownloadFile::deserialize(&mut &msg[..])?;
+        let file = DownloadFile::deserialize(&mut &msg[..])?
+            .map_err(Into::into)
+            .map_err(DownloadError::Deserialization)?;
         list.push(file.into());
     }
     let list = list;
@@ -41,32 +63,6 @@ async fn read_file_list(
     Ok(list)
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum DownloadError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error("deserialization error: {0}")]
-    Deserialization(MessageDeserializeError),
-    #[error("protocol error: {0}")]
-    Protocol(ProtocolError),
-}
-impl From<MessageDeserializeError> for DownloadError {
-    fn from(e: MessageDeserializeError) -> Self {
-        match e {
-            MessageDeserializeError::Io(e) => Self::Io(e),
-            _ => Self::Deserialization(e),
-        }
-    }
-}
-impl From<ProtocolError> for DownloadError {
-    fn from(e: ProtocolError) -> Self {
-        match e {
-            ProtocolError::Io(e) => Self::Io(e),
-            _ => Self::Protocol(e),
-        }
-    }
-}
-
 // if destdir is NULL, the files will not be read from the message (ie. the
 // uploader must not send the file contents)
 async fn read_download_message(
@@ -74,7 +70,9 @@ async fn read_download_message(
     destdir: Option<&Path>,
 ) -> Result<Vec<FileInfo>, DownloadError> {
     let msg = read_message(socket).await?;
-    let msg = DownloadMessage::deserialize(&mut &msg[..])?;
+    let msg = DownloadMessage::deserialize(&mut &msg[..])?
+        .map_err(Into::into)
+        .map_err(DownloadError::Deserialization)?;
     return Ok(read_file_list(socket, msg.file_count(), destdir).await?);
 }
 
@@ -96,7 +94,7 @@ pub async fn download(
     {
         // send download response
         assert!(recvlist.len() <= 255); // this is a protocol limit
-        let hashes: Vec<FileHash> = recvlist.iter().map(|f| f.hash()).cloned().collect();
+        let hashes: Vec<Hash> = recvlist.iter().map(|f| f.hash()).cloned().collect();
         let resp = DownloadResponse::new(download_response::Flags::empty(), hashes);
         let mut buf = Vec::with_capacity(4096);
         resp.serialize(&mut buf)?;

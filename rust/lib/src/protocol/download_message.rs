@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 
 use bitflags::bitflags;
 
-use crate::serial::{Deserialize, Serialize};
+use crate::serial::{self, Deserialize, Serialize, deserialize, from_infallible};
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,9 +58,7 @@ impl DownloadMessage {
 }
 
 impl Serialize for DownloadMessage {
-    type Error = std::io::Error;
-
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
+    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         self.flags.bits().serialize(writer)?;
         self.file_count.serialize(writer)?;
         Ok(())
@@ -68,25 +66,26 @@ impl Serialize for DownloadMessage {
 }
 #[derive(Debug, thiserror::Error)]
 pub enum MessageDeserializeError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
     #[error("invalid flags")]
     InvalidFlags,
     #[error("error flag set to unexpected value")]
     ErrorFlag,
 }
+from_infallible!(MessageDeserializeError);
 
 impl Deserialize for DownloadMessage {
     type Error = MessageDeserializeError;
 
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
-        let flags = Flags::from_bits(u8::deserialize(reader)?)
-            .ok_or(MessageDeserializeError::InvalidFlags)?;
-        if flags.contains(Flags::isError) {
-            return Err(MessageDeserializeError::ErrorFlag);
-        }
-        let file_count = u8::deserialize(reader)?;
-        Ok(Self { flags, file_count })
+    fn deserialize(reader: &mut dyn Read) -> serial::Result<Self, Self::Error> {
+        let flags = deserialize!(reader, u8);
+
+        let flags = match Flags::from_bits(flags) {
+            Some(flags) if !flags.contains(Flags::isError) => flags,
+            Some(_) => return Ok(Err(MessageDeserializeError::ErrorFlag)),
+            None => return Ok(Err(MessageDeserializeError::InvalidFlags)),
+        };
+        let file_count = deserialize!(reader, u8);
+        Ok(Ok(Self { flags, file_count }))
     }
 }
 
@@ -102,7 +101,7 @@ mod tests {
     #[test]
     fn deserialize_works() {
         let bytes = [0, 1];
-        let message = DownloadMessage::deserialize(&mut bytes.as_slice()).unwrap();
+        let message = DownloadMessage::deserialize(&mut bytes.as_slice()).unwrap().unwrap();
         assert_eq!(message, DownloadMessage::new(Flags::empty(), 1));
     }
     #[test]
@@ -111,7 +110,7 @@ mod tests {
         let mut buffer = Vec::new();
         message.serialize(&mut buffer).unwrap();
 
-        let deserialized = DownloadMessage::deserialize(&mut buffer.as_slice()).unwrap();
+        let deserialized = DownloadMessage::deserialize(&mut buffer.as_slice()).unwrap().unwrap();
         assert_eq!(message, deserialized);
     }
 }

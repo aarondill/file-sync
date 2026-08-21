@@ -7,14 +7,11 @@ use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
 use futures::StreamExt;
-use lib::client_connect::{self, ClientConnect};
-use lib::download::download;
+use lib::common::{download, upload};
 use lib::file_info::FileInfo;
-use lib::protocol::write_message;
+use lib::io::{check_readable, write_message};
+use lib::protocol::{ClientConnect, ProtocolString, client_connect};
 use lib::serial::Serialize;
-use lib::upload::upload;
-use lib::util::check_readable;
-use lib::variable_length_string::VariableLengthString;
 use tokio::net::TcpStream;
 use tokio::pin;
 use tokio::sync::mpsc;
@@ -24,7 +21,8 @@ fn init_connect_msg(upload: bool) -> ClientConnect {
     let name = std::net::hostname().unwrap_or_else(|_| "unknown".into());
     let flags =
         if upload { client_connect::Flags::IntentToUpload } else { client_connect::Flags::empty() };
-    let name = VariableLengthString::new_truncate(name.to_string_lossy().as_bytes());
+    let name =
+        ProtocolString::new_truncate(&name.to_string_lossy()).expect("hostname is valid ascii");
     ClientConnect::new(flags, name)
 }
 

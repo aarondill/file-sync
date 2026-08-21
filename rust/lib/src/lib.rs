@@ -1,13 +1,6 @@
-pub mod client_connect;
-pub mod download;
-pub mod download_file;
-pub mod download_message;
-pub mod download_response;
-pub mod error;
-pub mod file_hash;
+pub mod common;
 pub mod file_info;
+pub mod io;
+pub mod md5;
 pub mod protocol;
 pub mod serial;
-pub mod upload;
-pub mod util;
-pub mod variable_length_string;

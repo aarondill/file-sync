@@ -2,8 +2,9 @@ use std::io::{Read, Write};
 
 use bitflags::bitflags;
 
-use crate::serial::{Deserialize, Serialize};
-use crate::variable_length_string::VariableLengthString;
+use crate::protocol::ProtocolString;
+use crate::serial::{Deserialize, Serialize, deserialize, from_infallible};
+use crate::{protocol, serial};
 const PROTOCOL_VERSION: u8 = 2;
 
 bitflags! {
@@ -17,7 +18,7 @@ bitflags! {
 pub struct ClientConnect {
     protocol_version: u8,
     flags: Flags,
-    client_name: VariableLengthString,
+    client_name: ProtocolString,
 }
 
 impl ClientConnect {
@@ -29,27 +30,28 @@ impl ClientConnect {
         &self.flags
     }
 
-    pub fn client_name(&self) -> &VariableLengthString {
+    pub fn client_name(&self) -> &ProtocolString {
         &self.client_name
     }
 
-    pub fn new(flags: Flags, client_name: VariableLengthString) -> Self {
+    pub fn new(flags: Flags, client_name: ProtocolString) -> Self {
         Self { protocol_version: PROTOCOL_VERSION, flags, client_name }
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum SerialError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
     #[error("protocol version mismatch: got {0}, expected {PROTOCOL_VERSION}")]
     ProtocolVersionMismatch(u8),
+    #[error(transparent)]
+    String(#[from] protocol::string::SerialError),
+    #[error("invalid flags")]
+    InvalidFlags,
 }
+from_infallible!(SerialError);
 
 impl Serialize for ClientConnect {
-    type Error = std::io::Error;
-
-    fn serialize(&self, writer: &mut dyn Write) -> Result<(), Self::Error> {
+    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
         self.protocol_version.serialize(writer)?;
         self.flags.bits().serialize(writer)?;
         self.client_name.serialize(writer)?;
@@ -59,18 +61,20 @@ impl Serialize for ClientConnect {
 impl Deserialize for ClientConnect {
     type Error = SerialError;
 
-    fn deserialize(reader: &mut dyn Read) -> Result<Self, Self::Error> {
-        let protocol_version = u8::deserialize(reader)?;
+    fn deserialize(reader: &mut dyn Read) -> serial::Result<Self, Self::Error> {
+        let protocol_version = deserialize!(reader, u8);
         if protocol_version != PROTOCOL_VERSION {
-            return Err(SerialError::ProtocolVersionMismatch(protocol_version));
+            return Ok(Err(SerialError::ProtocolVersionMismatch(protocol_version)));
         }
 
-        let flags = u8::deserialize(reader)?;
-        let flags = Flags::from_bits(flags).expect("invalid flags");
+        let flags = deserialize!(reader, u8);
+        let Some(flags) = Flags::from_bits(flags) else {
+            return Ok(Err(SerialError::InvalidFlags));
+        };
 
-        let client_name = VariableLengthString::deserialize(reader)?;
+        let client_name = deserialize!(reader, ProtocolString);
 
-        Ok(Self { protocol_version, flags, client_name })
+        Ok(Ok(Self { protocol_version, flags, client_name }))
     }
 }
 
@@ -89,7 +93,7 @@ mod tests {
     #[test]
     fn deserialize_works() {
         let bytes = [PROTOCOL_VERSION, 0b00000001, 4, b't', b'e', b's', b't'];
-        let res = ClientConnect::deserialize(&mut &bytes[..]).expect("failed to serialize");
+        let res = ClientConnect::deserialize(&mut &bytes[..]).unwrap().unwrap();
 
         let expected = ClientConnect::new(Flags::IntentToUpload, "test".try_into().unwrap());
         assert_eq!(res, expected);
@@ -102,7 +106,7 @@ mod tests {
         test.serialize(&mut bytes).expect("failed to serialize");
 
         let mut reader = std::io::Cursor::new(bytes);
-        let test2 = ClientConnect::deserialize(&mut reader).expect("failed to deserialize");
+        let test2 = ClientConnect::deserialize(&mut reader).unwrap().unwrap();
         assert_eq!(test, test2);
     }
 }

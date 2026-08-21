@@ -4,13 +4,13 @@ use futures::{Stream, StreamExt};
 use tokio::fs;
 use walkdir::WalkDir;
 
-use crate::file_hash::FileHash;
+use crate::md5::Hash;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct FileInfo {
     // A relative path from the base directory
     path: PathBuf,
-    hash: FileHash,
+    hash: Hash,
     size: u64,
 }
 impl FileInfo {
@@ -18,7 +18,7 @@ impl FileInfo {
         &self.path
     }
 
-    pub fn hash(&self) -> &FileHash {
+    pub fn hash(&self) -> &Hash {
         &self.hash
     }
 
@@ -26,7 +26,7 @@ impl FileInfo {
         self.size
     }
 
-    pub fn new(path: PathBuf, hash: FileHash, size: u64) -> FileInfo {
+    pub fn new(path: PathBuf, hash: Hash, size: u64) -> FileInfo {
         FileInfo { path, hash, size }
     }
 
@@ -42,7 +42,7 @@ impl FileInfo {
         let abs_path = base.join(&path);
         let size = fs::metadata(&abs_path).await?.len();
         let mut file = fs::File::open(&abs_path).await?;
-        let hash = FileHash::new(&mut file).await?;
+        let hash = Hash::new(&mut file).await?;
         Ok(FileInfo { path, hash, size })
     }
 

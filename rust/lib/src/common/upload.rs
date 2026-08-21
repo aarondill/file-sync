@@ -4,31 +4,24 @@ use std::path::Path;
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
-use crate::download_file::DownloadFile;
-use crate::download_message::{self, DownloadMessage};
-use crate::download_response::DownloadResponse;
 use crate::file_info::FileInfo;
-use crate::protocol::{ProtocolError, read_message, write_message};
+use crate::io::{ProtocolError, read_message, write_message};
+use crate::protocol::download_file::FileInfoError;
+use crate::protocol::{DownloadFile, DownloadMessage, DownloadResponse, download_message};
 use crate::serial::{Deserialize, Serialize};
 
 #[derive(Debug, thiserror::Error)]
 pub enum UploadError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("deserialization error: {0}")]
+    Deserialize(Box<dyn std::error::Error + Send + Sync>),
     #[error(transparent)]
-    Deserialize(download_message::MessageDeserializeError),
+    FileInfo(#[from] FileInfoError),
     #[error(transparent)]
     Protocol(ProtocolError),
     #[error("requested file not in local list")]
     FileNotFound,
-}
-impl From<download_message::MessageDeserializeError> for UploadError {
-    fn from(e: download_message::MessageDeserializeError) -> Self {
-        match e {
-            download_message::MessageDeserializeError::Io(e) => Self::Io(e),
-            e => Self::Deserialize(e),
-        }
-    }
 }
 impl From<ProtocolError> for UploadError {
     fn from(e: ProtocolError) -> Self {
@@ -47,7 +40,7 @@ async fn write_file_list<T: Borrow<FileInfo>>(
     // Send file metadata
     let mut buf = Vec::with_capacity(4096);
     for node in list {
-        let f: DownloadFile = node.borrow().into();
+        let f: DownloadFile = node.borrow().try_into()?;
         f.serialize(&mut buf)?;
         write_message(socket, &buf).await?;
         buf.clear();
@@ -90,7 +83,9 @@ pub async fn upload(
     // Receive download response
     let msg = read_message(read).await?;
     let mut cursor = std::io::Cursor::new(msg);
-    let resp = DownloadResponse::deserialize(&mut cursor)?;
+    let resp = DownloadResponse::deserialize(&mut cursor)?
+        .map_err(Into::into)
+        .map_err(UploadError::Deserialize)?;
     assert_eq!(cursor.position(), cursor.into_inner().len() as u64); // EOF
 
     let filtered_list = resp
